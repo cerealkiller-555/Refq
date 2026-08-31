@@ -1,0 +1,225 @@
+/* ============================================================
+   رِفق — Design Tokens & Global Styles (P0.2)
+   ألوان دافئة هادئة، دعم كامل للعربية RTL
+   ============================================================ */
+
+:root {
+  /* ألوان أساسية — دافئة وهادئة */
+  --color-bg: #f5efe6;
+  --color-surface: #fffdf9;
+  --color-surface-raised: #ffffff;
+  --color-text: #3d3a34;
+  --color-text-muted: #8a857b;
+  --color-primary: #8a6d3b;
+  --color-primary-soft: #e8dcc8;
+  --color-primary-hover: #72603a;
+  --color-accent: #6d8a5f;
+  --color-accent-soft: #dce8d5;
+  --color-danger: #a0524d;
+  --color-danger-soft: #f0dcd8;
+  --color-warning: #c08a45;
+  --color-warning-soft: #f6ead8;
+
+  /* طاقة */
+  --color-energy-low: #c08a45;
+  --color-energy-low-soft: #f6ead8;
+  --color-energy-medium: #a8b05a;
+  --color-energy-medium-soft: #eef0d9;
+  --color-energy-high: #6d8a5f;
+  --color-energy-high-soft: #dce8d5;
+
+  /* مسافات */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* زوايا */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 999px;
+
+  /* ظلال */
+  --shadow-sm: 0 1px 3px rgba(61, 58, 52, 0.08);
+  --shadow-md: 0 4px 12px rgba(61, 58, 52, 0.1);
+  --shadow-lg: 0 8px 24px rgba(61, 58, 52, 0.12);
+
+  /* خط */
+  --font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.5rem;
+
+  /* حركة */
+  --transition-fast: 150ms ease;
+  --transition-med: 250ms ease;
+}
+
+/* الوضع الليلي — أساسي */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #201e1a;
+    --color-surface: #2a2822;
+    --color-surface-raised: #33302a;
+    --color-text: #e8e2d8;
+    --color-text-muted: #a39c90;
+    --color-primary: #c9a76a;
+    --color-primary-soft: #4a4132;
+    --color-primary-hover: #d8b97e;
+    --color-accent: #96b188;
+    --color-accent-soft: #3a4a36;
+    --color-danger: #d08a7f;
+    --color-danger-soft: #5a3a36;
+    --color-warning: #d8a860;
+    --color-warning-soft: #54442d;
+    --color-energy-low: #d8a860;
+    --color-energy-low-soft: #54442d;
+    --color-energy-medium: #b9c26e;
+    --color-energy-medium-soft: #4a5233;
+    --color-energy-high: #96b188;
+    --color-energy-high-soft: #3a4a36;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-family);
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  direction: rtl;
+}
+
+#root {
+  min-height: 100%;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* ===== أساسيات رِفق ===== */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  padding: var(--space-5) var(--space-4) var(--space-3);
+  text-align: center;
+  background: linear-gradient(180deg, var(--color-primary-soft), transparent);
+}
+
+.app-header h1 {
+  font-size: var(--font-size-xl);
+  color: var(--color-primary);
+  margin-bottom: var(--space-1);
+}
+
+.app-tagline {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.app-main {
+  flex: 1;
+  padding: var(--space-4);
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.placeholder-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-7) var(--space-5);
+  text-align: center;
+  color: var(--color-text-muted);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ===== شاشات الأقسام ===== */
+.screen {
+  padding-bottom: var(--space-7);
+}
+
+.screen-title {
+  font-size: var(--font-size-lg);
+  color: var(--color-primary);
+  margin-bottom: var(--space-4);
+}
+
+/* ===== شريط التنقل السفلي ===== */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  background: var(--color-surface-raised);
+  border-top: 1px solid rgba(61, 58, 52, 0.08);
+  box-shadow: var(--shadow-md);
+  z-index: 10;
+}
+
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-2) 0 var(--space-3);
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 0.7rem;
+  transition: color var(--transition-fast);
+}
+
+.nav-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.nav-item.active {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+@media (min-width: 768px) {
+  .bottom-nav {
+    position: sticky;
+    top: 0;
+    max-width: 640px;
+    margin: 0 auto;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  }
+}
