@@ -9,7 +9,7 @@ import type { BackupSnapshot } from '../core/types';
 
 /** إنشاء نسخة احتياطية كاملة (كل الجداول) بصيغة JSON versioned */
 export async function exportAll(): Promise<BackupSnapshot> {
-  const [tasks, calendarEvents, paths, pathItems, sessions, notes, noteIndexes, folders, reflections, energyCheckins, shariaTexts, settings] =
+  const [tasks, calendarEvents, paths, pathItems, sessions, notes, noteIndexes, folders, reflections, energyCheckins, shariaTexts, prayerAnchors, settings] =
     await Promise.all([
       db.tasks.toArray(),
       db.calendarEvents.toArray(),
@@ -22,6 +22,7 @@ export async function exportAll(): Promise<BackupSnapshot> {
       db.reflections.toArray(),
       db.energyCheckins.toArray(),
       db.shariaTexts.toArray(),
+      db.prayerAnchors.toArray(),
       db.settings.toArray()
     ]);
 
@@ -41,6 +42,7 @@ export async function exportAll(): Promise<BackupSnapshot> {
       reflections,
       energyCheckins,
       shariaTexts,
+      prayerAnchors,
       settings
     }
   };
@@ -75,6 +77,7 @@ export async function importAll(snapshot: BackupSnapshot): Promise<string[]> {
   if (d.reflections) { await db.reflections.clear(); await db.reflections.bulkPut(d.reflections); results.push('reflections'); }
   if (d.energyCheckins) { await db.energyCheckins.clear(); await db.energyCheckins.bulkPut(d.energyCheckins); results.push('energyCheckins'); }
   if (d.shariaTexts) { await db.shariaTexts.clear(); await db.shariaTexts.bulkPut(d.shariaTexts); results.push('shariaTexts'); }
+  if (d.prayerAnchors) { await db.prayerAnchors.clear(); await db.prayerAnchors.bulkPut(d.prayerAnchors); results.push('prayerAnchors'); }
   if (d.settings) { await db.settings.clear(); await db.settings.bulkPut(d.settings); results.push('settings'); }
 
   return results;
@@ -94,6 +97,7 @@ export async function deleteAllData(): Promise<void> {
     db.reflections.clear(),
     db.energyCheckins.clear(),
     db.shariaTexts.clear(),
+    db.prayerAnchors.clear(),
     db.settings.clear(),
     db.backups.clear()
   ]);

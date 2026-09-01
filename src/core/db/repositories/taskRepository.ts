@@ -40,6 +40,11 @@ class TaskRepository extends BaseRepository<TaskRecord> {
     return this.update(id, { status: 'done' });
   }
 
+  /** إنجاز مهمة — تسمية أوضح للاستخدام في الـstores والـUI */
+  async complete(id: string): Promise<TaskRecord | undefined> {
+    return this.update(id, { status: 'done' });
+  }
+
   async setScheduled(id: string, scheduledAt: string): Promise<TaskRecord | undefined> {
     return this.update(id, { scheduledAt });
   }

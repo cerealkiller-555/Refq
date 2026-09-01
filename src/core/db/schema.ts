@@ -18,11 +18,28 @@ import type {
   EnergyCheckin,
   ShariaText,
   Settings,
-  BackupSnapshot
+  BackupSnapshot,
+  PrayerAnchor
 } from '../types';
 
 const DB_NAME = 'refq';
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
+
+const V1_STORES = {
+  tasks: 'id, status, scheduledAt, deadline, linkedPathItemId, order',
+  calendarEvents: 'id, start, end, kind, linkedTaskId, pathId',
+  paths: 'id, type, status, order, deadline',
+  pathItems: 'id, pathId, parentId, status, order',
+  sessions: 'id, pathItemId, date',
+  notes: 'id, title, folderId, updatedAt',
+  noteIndexes: 'noteId, updatedAt',
+  folders: 'id, name, parentId',
+  reflections: 'id, kind, date, linkedPathItemId',
+  energyCheckins: 'id, date',
+  shariaTexts: 'id, kind, pathId',
+  settings: 'id',
+  backups: 'id, createdAt, schemaVersion'
+};
 
 export interface RefqDatabase extends Dexie {
   tasks: Table<TaskRecord, string>;
@@ -38,6 +55,8 @@ export interface RefqDatabase extends Dexie {
   shariaTexts: Table<ShariaText, string>;
   settings: Table<Settings, string>;
   backups: Table<BackupSnapshot, string>;
+  /** v2 — مراسي الصلوات (تأسيس معماري؛ لا UI في P1) */
+  prayerAnchors: Table<PrayerAnchor, string>;
 }
 
 class RefqDatabaseImpl extends Dexie {
@@ -54,23 +73,14 @@ class RefqDatabaseImpl extends Dexie {
   shariaTexts!: Table<ShariaText, string>;
   settings!: Table<Settings, string>;
   backups!: Table<BackupSnapshot, string>;
+  prayerAnchors!: Table<PrayerAnchor, string>;
 
   constructor() {
     super(DB_NAME);
-    this.version(CURRENT_SCHEMA_VERSION).stores({
-      tasks: 'id, status, scheduledAt, deadline, linkedPathItemId, order',
-      calendarEvents: 'id, start, end, kind, linkedTaskId, pathId',
-      paths: 'id, type, status, order, deadline',
-      pathItems: 'id, pathId, parentId, status, order',
-      sessions: 'id, pathItemId, date',
-      notes: 'id, title, folderId, updatedAt',
-      noteIndexes: 'noteId, updatedAt',
-      folders: 'id, name, parentId',
-      reflections: 'id, kind, date, linkedPathItemId',
-      energyCheckins: 'id, date',
-      shariaTexts: 'id, kind, pathId',
-      settings: 'id',
-      backups: 'id, createdAt, schemaVersion'
+    this.version(1).stores(V1_STORES);
+    // v2 — إضافة جدول مراسي الصلوات فقط؛ الجداول الأخرى تُورَّث تلقائيًا
+    this.version(2).stores({
+      prayerAnchors: 'id, date, prayer'
     });
   }
 }
@@ -90,6 +100,7 @@ export const dbSchema = {
     'reflections',
     'energyCheckins',
     'shariaTexts',
+    'prayerAnchors',
     'settings',
     'backups'
   ]
@@ -97,17 +108,12 @@ export const dbSchema = {
 
 /**
  * محرك مصغّر للترقية متعدد الإصدارات.
- * كل إضافة migration تضيف خطوة في مصفوفة migrations.
- * نبدأ v1، لذا هذا skeleton جاهز للنسخ القادمة (sync, fields...)
+ * v1 → v2: إضافة جدول prayerAnchors فقط — Dexie يديرها تلقائيًا بلا upgrade().
  */
 interface Migration {
   version: number;
   upgrade(): void;
 }
-// مستقبلًا:
-// const migrations: Migration[] = [
-//   { version: 2, upgrade: () => { /* مثلا إضافة فهرس جديد */ } },
-// ];
 const migrations: Migration[] = [];
 
 // Singleton — نفس قاعدة بيانات التطبيق عبر كل الجلسة

@@ -20,6 +20,14 @@ export function todayISODate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** مفتاح التاريخ المحلي (YYYY-MM-DD) — صحيح لتطبيق شخصي local-first */
+export function localDateKey(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 /** إضافة أيام لتاريخ معيّن وإرجاع ISO */
 export function addDaysISO(date: string | Date, days: number): string {
   const d = typeof date === 'string' ? new Date(date) : new Date(date.getTime());

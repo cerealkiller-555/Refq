@@ -5,6 +5,7 @@
 import { db } from '../schema';
 import { BaseRepository } from './baseRepository';
 import type { ReflectionEntry, EnergyCheckin } from '../../types';
+import { localDateKey } from '../../../utils';
 
 class ReflectionRepository extends BaseRepository<ReflectionEntry> {
   constructor() {
@@ -43,7 +44,7 @@ class EnergyCheckinRepository extends BaseRepository<EnergyCheckin> {
 
   /** إدخال اليوم (يستبدل السابق إن وجد) */
   async upsertToday(level: EnergyCheckin['level'], note?: string, wantsLightDay = false): Promise<EnergyCheckin> {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateKey();
     const existing = await this.table.where('date').equals(today).first();
     if (existing) {
       return this.update(existing.id, { level, note, wantsLightDay }) as Promise<EnergyCheckin>;
@@ -57,7 +58,7 @@ class EnergyCheckinRepository extends BaseRepository<EnergyCheckin> {
   }
 
   async getToday(): Promise<EnergyCheckin | undefined> {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateKey();
     return this.table.where('date').equals(today).first();
   }
 }

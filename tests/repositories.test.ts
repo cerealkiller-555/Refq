@@ -11,7 +11,8 @@ import {
   pathItemRepository,
   learningPathRepository,
   noteRepository,
-  folderRepository
+  folderRepository,
+  prayerAnchorRepository
 } from '../src/core/db/repositories';
 import { db } from '../src/core/db/schema';
 
@@ -132,5 +133,59 @@ describe('Refq Database', () => {
 
     const byKind = await reflectionRepository.getByKind('athar');
     expect(byKind.map((r) => r.id)).toContain(reflection.id);
+  });
+
+  it('Task Repo P1 — CRUD كامل وcomplete وedge cases', async () => {
+    const task = await taskRepository.create({
+      title: 'مهمة P1',
+      importance: 'low',
+      urgency: 'low',
+      estimatedDuration: 20,
+      status: 'todo'
+    } as Parameters<typeof taskRepository.create>[0]);
+
+    // read
+    const read = await taskRepository.get(task.id);
+    expect(read?.title).toBe('مهمة P1');
+
+    // update
+    const updated = await taskRepository.update(task.id, { title: 'مهمة P1 معدلة', importance: 'high' });
+    expect(updated?.title).toBe('مهمة P1 معدلة');
+    expect(updated?.importance).toBe('high');
+        expect(updated).toBeDefined();
+    expect(updated!.updatedAt >= task.updatedAt).toBe(true);
+
+    // complete
+    const done = await taskRepository.complete(task.id);
+    expect(done?.status).toBe('done');
+
+    // قائمة المفتوحة لا تشمل المكتملة
+    const open = await taskRepository.getOpenTasks();
+    expect(open.find((t) => t.id === task.id)).toBeUndefined();
+
+    // delete
+    await taskRepository.delete(task.id);
+    expect(await taskRepository.get(task.id)).toBeUndefined();
+
+    // edge: تحديث معرف غير موجود → undefined بلا خطأ
+    const missing = await taskRepository.update('no-such-id', { title: 'x' });
+    expect(missing).toBeUndefined();
+  });
+
+  it('Prayer Anchors Repo — upsert لكل صلاة وقراءة اليوم ومسح اليوم', async () => {
+    const day = '2026-01-10';
+    const fajr = await prayerAnchorRepository.upsert(day, 'fajr', '2026-01-10T05:00:00.000Z');
+    await prayerAnchorRepository.upsert(day, 'maghrib', '2026-01-10T14:30:00.000Z');
+
+    // نفس الصلاة → تحديث وليس تكرار
+    const updated = await prayerAnchorRepository.upsert(day, 'fajr', '2026-01-10T05:05:00.000Z');
+    expect(updated.id).toBe(fajr.id);
+
+    const list = await prayerAnchorRepository.getForDate(day);
+    expect(list).toHaveLength(2);
+    expect(list.map((a) => a.prayer).sort()).toEqual(['fajr', 'maghrib']);
+
+    await prayerAnchorRepository.clearDate(day);
+    expect(await prayerAnchorRepository.getForDate(day)).toHaveLength(0);
   });
 });

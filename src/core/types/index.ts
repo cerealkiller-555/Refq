@@ -142,6 +142,28 @@ export interface ReflectionEntry extends Timestamps {
   skipped: boolean;
 }
 
+// ===== Prayer Anchors (مراسي الصلوات) =====
+// الصلوات هي العلامات الطبيعية لتقسيم اليوم — ليس مجرد يوم من 00:00 إلى 24:00.
+// لا يُستنتج الموعد أبدًا: يدوي الآن، ومن خدمة مواقيت لاحقًا (P2) بنفس النموذج.
+
+export type PrayerKey = 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
+
+export interface PrayerAnchor extends Timestamps {
+  id: ID;
+  date: string; // YYYY-MM-DD (تاريخ محلي)
+  prayer: PrayerKey;
+  time: string; // ISO datetime
+  source: 'manual' | 'service';
+}
+
+// فترة زمنية بين مرساة وأخرى — مساحة تخطيط مستقلة نسبيًا
+export interface DayPeriod {
+  anchor: PrayerKey | 'night'; // بداية الفترة ('night' = ليل قبل الفجر أو بعد العشاء)
+  start: string | null; // ISO — بداية الفترة
+  end: string | null; // ISO — نهاية الفترة (وقت الصلاة التالية)، null = مفتوحة
+  remainingMinutes: number | null; // المتبقي الآن؛ null = بلا سقف عملي
+}
+
 // ===== System =====
 
 export type EnergyLevel = 'low' | 'medium' | 'high';
@@ -204,6 +226,7 @@ export interface BackupSnapshot {
     reflections?: ReflectionEntry[];
     energyCheckins?: EnergyCheckin[];
     shariaTexts?: ShariaText[];
+    prayerAnchors?: PrayerAnchor[];
     settings?: Settings[];
   };
 }

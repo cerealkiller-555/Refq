@@ -1,5 +1,6 @@
 // ============================================================
-// رِفق — Planning Store (المهام، التقويم، إعادة التخطيط)
+// رِفق — Planning Store (المهام — إدارة كاملة)
+// التقويم والأحداث تُبنى في P2 فوق نفس الـstore.
 // ============================================================
 
 import { create } from 'zustand';
@@ -16,6 +17,9 @@ interface PlanningState {
   addTask: (task: Omit<TaskRecord, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   addEvent: (event: Omit<CalendarEvent, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   markTaskDone: (id: string) => Promise<void>;
+  reopenTask: (id: string) => Promise<void>;
+  updateTask: (id: string, changes: Partial<TaskRecord>) => Promise<void>;
+  deleteTask: (id: string) => Promise<void>;
   replan: () => Promise<void>;
 }
 
@@ -45,6 +49,24 @@ export const usePlanningStore = create<PlanningState>((set) => ({
 
   markTaskDone: async (id) => {
     await taskRepository.markDone(id);
+    const tasks = await taskRepository.getAll();
+    set({ tasks });
+  },
+
+  reopenTask: async (id) => {
+    await taskRepository.update(id, { status: 'todo' });
+    const tasks = await taskRepository.getAll();
+    set({ tasks });
+  },
+
+  updateTask: async (id, changes) => {
+    await taskRepository.update(id, changes);
+    const tasks = await taskRepository.getAll();
+    set({ tasks });
+  },
+
+  deleteTask: async (id) => {
+    await taskRepository.delete(id);
     const tasks = await taskRepository.getAll();
     set({ tasks });
   },
