@@ -42,6 +42,7 @@ export const voice = {
   planning: {
     tasksTitle: 'المهام',
     addTitle: 'مهمة جديدة',
+    tabs: { tasks: '📋 المهام', day: '📅 اليوم', week: '🗓️ الأسبوع' },
     fields: {
       title: 'اسم المهمة',
       importance: 'الأهمية',
@@ -55,7 +56,32 @@ export const voice = {
     urgencyLabels: { high: 'عاجلة', low: 'غير عاجلة' } as Record<string, string>,
     energyLabels: { low: 'خفيفة', medium: 'متوسطة', high: 'عميقة' } as Record<string, string>,
     empty: 'لا مهام بعد — أضيفي أول مهمة بهدوء.',
-    doneTitle: 'أُنجزت'
+    doneTitle: 'أُنجزت',
+    calendar: {
+      addTitle: 'حدث جديد',
+      title: 'عنوان الحدث',
+      kind: 'نوع الحدث',
+      fixed: 'ثابت',
+      flexible: 'مرن',
+      date: 'التاريخ',
+      time: 'الوقت',
+      duration: 'المدة (دقائق)',
+      note: 'ملاحظة (اختياري)',
+      add: 'إضافة الحدث',
+      noEvents: 'لا أحداث لهذا اليوم — المساحة مفتوحة 🤍',
+      previous: 'السابق',
+      next: 'التالي',
+      today: 'اليوم',
+      schedule: 'جدولة',
+      delete: 'حذف الحدث',
+      week: 'هذا الأسبوع',
+      missed: 'يوم فائت؟',
+      missedHint: 'مش لازم نعوّض كل شيء دفعة واحدة. نقدر نعيد توزيع المتبقي بلطف.',
+      replan: 'إعادة التوزيع بلطف',
+      replanned: 'أعدنا توزيع ما تبقّى على الأيام القادمة 🤍',
+      moved: 'تم نقل',
+      dayNames: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
+    }
   },
   heart: {
     placeholder: 'قسم القلب — أثر، فتش عن قلبك، وقفة، محاسبة. يُبنى في مرحلته الخاصة بلطف.'
