@@ -2,7 +2,7 @@
 // رِفق — الراوتر الرئيسي
 // ============================================================
 
-import { createBrowserRouter } from 'react-router-dom';
+import { createHashRouter } from 'react-router-dom';
 import { AppLayout } from './layout';
 import { TodayPage } from '../ui/screens/today/TodayPage';
 import { PlanningPage } from '../ui/screens/planning/PlanningPage';
@@ -11,7 +11,7 @@ import { VaultPage } from '../ui/screens/vault/VaultPage';
 import { HeartPage } from '../ui/screens/heart/HeartPage';
 import { SettingsPage } from '../ui/screens/system/SettingsPage';
 
-export const router = createBrowserRouter([
+export const router = createHashRouter([
   {
     path: '/',
     element: <AppLayout />,
