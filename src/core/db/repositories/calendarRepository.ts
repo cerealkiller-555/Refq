@@ -30,6 +30,15 @@ class CalendarRepository extends BaseRepository<CalendarEvent> {
   async getFlexible(): Promise<CalendarEvent[]> {
     return this.table.where('kind').equals('flexible').toArray();
   }
+
+  async getByLinkedTask(linkedTaskId: string): Promise<CalendarEvent[]> {
+    return this.table.where('linkedTaskId').equals(linkedTaskId).toArray();
+  }
+
+  async deleteByLinkedTaskId(linkedTaskId: string): Promise<void> {
+    const events = await this.getByLinkedTask(linkedTaskId);
+    await this.table.bulkDelete(events.map((event) => event.id));
+  }
 }
 
 export const calendarRepository = new CalendarRepository();
