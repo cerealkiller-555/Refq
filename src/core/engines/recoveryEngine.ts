@@ -107,3 +107,14 @@ export function recomputePlan(input: RecoveryInput): RecoveryPlan {
     generatedAt: now
   };
 }
+
+/**
+ * مهام مفتوحة كان جدولها في أيام فاتت (scheduledAt قبل اليوم المحلي).
+ * تُستخدم لعرض لافتة "يوم فائت؟" اللطيفة — بلا إجراء تلقائي أبدًا.
+ */
+export function findOverdueScheduledTasks(tasks: TaskRecord[], todayKey: string): TaskRecord[] {
+  return tasks.filter((t) => {
+    if (t.status === 'done' || !t.scheduledAt) return false;
+    return t.scheduledAt.slice(0, 10) < todayKey;
+  });
+}

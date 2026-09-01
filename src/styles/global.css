@@ -506,3 +506,207 @@ select {
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
 }
+
+/* ===== P2 — التقويم ===== */
+
+/* التبويبات */
+.tabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.tab {
+  background: var(--color-surface);
+  border: 1px solid rgba(61, 58, 52, 0.14);
+  border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  transition: var(--transition-fast);
+}
+
+.tab:hover {
+  border-color: var(--color-primary);
+  color: var(--color-text);
+}
+
+.tab.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fffdf9;
+}
+
+/* لافتة التعافي — لطيفة بلا لوم */
+.recovery-banner {
+  background: var(--color-warning-soft);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.recovery-banner.applied {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.banner-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* شريط التنقل اليومي/الأسبوعي */
+.day-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.day-label {
+  font-size: var(--font-size-md);
+  min-width: 140px;
+  text-align: center;
+}
+
+/* نموذج حدث */
+.event-form .form-row {
+  margin-top: var(--space-1);
+}
+
+/* قوائم الأحداث */
+.event-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.event-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border-right: 4px solid transparent;
+}
+
+.event-row.ev-fixed {
+  background: var(--color-primary-soft);
+  border-right-color: var(--color-primary);
+}
+
+.event-row.ev-flexible {
+  background: var(--color-accent-soft);
+  border-right-color: var(--color-accent);
+}
+
+.event-time {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  min-width: 96px;
+  direction: ltr;
+}
+
+.event-title {
+  flex: 1;
+}
+
+.event-kind {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+/* شبكة الأسبوع */
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(96px, 1fr));
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+}
+
+.week-col {
+  background: var(--color-surface);
+  border: 1px solid rgba(61, 58, 52, 0.1);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  min-height: 120px;
+}
+
+.week-col.today {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.week-day-head {
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+  width: 100%;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px dashed rgba(61, 58, 52, 0.15);
+  margin-bottom: var(--space-2);
+}
+
+.event-chip {
+  display: block;
+  font-size: 0.72rem;
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  margin-bottom: 4px;
+  line-height: 1.5;
+}
+
+.event-chip .event-time {
+  display: block;
+  min-width: 0;
+  font-size: 0.68rem;
+}
+
+.event-chip.ev-fixed {
+  background: var(--color-primary-soft);
+}
+
+.event-chip.ev-flexible {
+  background: var(--color-accent-soft);
+}
+
+/* نموذج جدولة مهمة */
+.schedule-form {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  flex-basis: 100%;
+  align-items: center;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+}
+
+.schedule-form .text-input {
+  margin-top: 0;
+  width: auto;
+}
+
+.task-schedule {
+  border: none;
+  background: transparent;
+  font-size: 1rem;
+  padding: 0 var(--space-1);
+  opacity: 0.75;
+}
+
+.task-schedule:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}

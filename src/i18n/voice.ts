@@ -55,7 +55,43 @@ export const voice = {
     urgencyLabels: { high: 'عاجلة', low: 'غير عاجلة' } as Record<string, string>,
     energyLabels: { low: 'خفيفة', medium: 'متوسطة', high: 'عميقة' } as Record<string, string>,
     empty: 'لا مهام بعد — أضيفي أول مهمة بهدوء.',
-    doneTitle: 'أُنجزت'
+    doneTitle: 'أُنجزت',
+    calendar: {
+      tabs: { tasks: '📋 المهام', day: '📅 اليوم', week: '🗓️ الأسبوع' },
+      addEventTitle: 'حدث جديد',
+      eventName: 'اسم الحدث',
+      kind: 'النوع',
+      kindFixed: 'ثابت — لا يتحرك أبدًا',
+      kindFlexible: 'مرن — وقت مخصص لمهمة',
+      date: 'التاريخ',
+      time: 'وقت البداية',
+      duration: 'المدة (دقائق)',
+      note: 'ملاحظة (اختياري)',
+      save: 'إضافة الحدث',
+      kindLabels: { fixed: 'ثابت', flexible: 'مرن' } as Record<string, string>,
+      emptyDay: 'لا أحداث في هذا اليوم — يوم مفتوح لك 🤍',
+      emptyWeek: 'أسبوعك فاضي — أضيفي أول حدث بهدوء.',
+      prev: 'السابق',
+      next: 'التالي',
+      today: 'اليوم',
+      dayNames: ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'] as string[],
+      schedule: {
+        button: 'جدولة 📅',
+        title: 'جدولة المهمة في التقويم',
+        date: 'اليوم',
+        time: 'الساعة',
+        confirm: 'حدّدها',
+        cancel: 'بدون جدولة',
+        done: 'المهمة اتحطت في التقويم 📅 تقدري تغيريها في أي وقت.'
+      },
+      recovery: {
+        banner: 'فيه مهام كانت مجدولة في أيام فاتت. نعيد توزيعها على الأيام الجاية بلطف؟',
+        button: 'أعد التوزيع بلطف',
+        applied: 'تمت إعادة التوزيع 🤍 مفيش ضغط، والثوابت ما اتحركتش أبدًا.',
+        dismiss: 'شكرًا، دلوقتي كفاية'
+      },
+      scheduledChip: 'مجدولة'
+    }
   },
   heart: {
     placeholder: 'قسم القلب — أثر، فتش عن قلبك، وقفة، محاسبة. يُبنى في مرحلته الخاصة بلطف.'

@@ -10,8 +10,18 @@ import {
   describeReason
 } from '../src/core/engines/priorityEngine';
 import { suggestTask } from '../src/core/engines/suggestionEngine';
-import { recomputePlan } from '../src/core/engines/recoveryEngine';
+import { recomputePlan, findOverdueScheduledTasks } from '../src/core/engines/recoveryEngine';
 import { getCurrentPeriod, getDayPeriods } from '../src/core/engines/dayPeriods';
+import {
+  expandEvent,
+  expandEvents,
+  eventsForDay,
+  eventsForWeek,
+  weekDayKeys,
+  addDaysKey,
+  formatEventTime,
+  localDateTimeISO
+} from '../src/core/engines/calendarEngine';
 import type { TaskRecord, CalendarEvent, PrayerAnchor } from '../src/core/types';
 
 function makeTask(partial: Partial<TaskRecord> = {}): TaskRecord {
@@ -345,5 +355,141 @@ describe('RecoveryEngine P1', () => {
     expect(plan.moved.every((m) => m.taskId !== prayer.id)).toBe(true);
     // سعة يوم الصلاة = 300 - 20 = 280 → المهمة (100) تتسع فيه
     expect(plan.moved[0]?.scheduledAt.slice(0, 10)).toBe('2026-01-11');
+  });
+
+  it('المهام المجدولة في أيام فاتت تُكتشف للافتة اللطيفة — والمكتملة والمحررة لا', () => {
+    const tasks = [
+      makeTask({ id: 'overdue', scheduledAt: '2026-01-08T09:00:00.000Z' }),
+      makeTask({ id: 'today', scheduledAt: '2026-01-10T09:00:00.000Z' }),
+      makeTask({ id: 'done-old', status: 'done', scheduledAt: '2026-01-01T09:00:00.000Z' }),
+      makeTask({ id: 'no-sched' })
+    ];
+    const overdue = findOverdueScheduledTasks(tasks, '2026-01-10');
+    expect(overdue.map((t) => t.id)).toEqual(['overdue']);
+  });
+});
+
+// ===== P2 — CalendarEngine: توسيع وعرض التقويم =====
+
+describe('CalendarEngine', () => {
+  function makeEvent(partial: Partial<CalendarEvent>): CalendarEvent {
+    return {
+      id: 'e1',
+      title: 'حدث',
+      kind: 'fixed',
+      start: '2026-01-10T09:00:00.000Z',
+      end: '2026-01-10T10:00:00.000Z',
+      createdAt: '',
+      updatedAt: '',
+      ...partial
+    };
+  }
+
+  it('حدث غير متكرر يظهر مرة واحدة إذا تراكب مع النطاق فقط', () => {
+    const ev = makeEvent({});
+    expect(expandEvent(ev, '2026-01-10T00:00:00.000Z', '2026-01-11T00:00:00.000Z')).toHaveLength(1);
+    expect(expandEvent(ev, '2026-01-11T00:00:00.000Z', '2026-01-12T00:00:00.000Z')).toHaveLength(0);
+  });
+
+  it('حدث يمتد عبر منتصف الليل يظهر في اليومين (تراكب)', () => {
+    const ev = makeEvent({ start: '2026-01-10T23:00:00.000Z', end: '2026-01-11T01:00:00.000Z' });
+    const day1 = expandEvent(ev, '2026-01-10T00:00:00.000Z', '2026-01-11T00:00:00.000Z');
+    const day2 = expandEvent(ev, '2026-01-11T00:00:00.000Z', '2026-01-12T00:00:00.000Z');
+    expect(day1).toHaveLength(1);
+    expect(day2).toHaveLength(1);
+  });
+
+  it('التكرار اليومي يُوسَّع على كل الأيام ضمن النطاق', () => {
+    const ev = makeEvent({
+      recurring: { freq: 'daily' },
+      start: '2026-01-10T09:00:00.000Z',
+      end: '2026-01-10T09:30:00.000Z'
+    });
+    const occ = expandEvent(ev, '2026-01-10T00:00:00.000Z', '2026-01-14T00:00:00.000Z');
+    expect(occ).toHaveLength(4); // 10، 11، 12، 13
+    expect(occ[1].start.slice(0, 10)).toBe('2026-01-11');
+  });
+
+  it('التكرار الأسبوعي يُوسَّع كل 7 أيام فقط', () => {
+    const ev = makeEvent({
+      recurring: { freq: 'weekly' },
+      start: '2026-01-10T09:00:00.000Z',
+      end: '2026-01-10T10:00:00.000Z'
+    });
+    const occ = expandEvent(ev, '2026-01-10T00:00:00.000Z', '2026-01-25T00:00:00.000Z');
+    expect(occ.map((o) => o.start.slice(0, 10))).toEqual(['2026-01-10', '2026-01-17', '2026-01-24']);
+  });
+
+  it('until يوقف التكرار (المرساة بعد النهاية لا تُولَّد)', () => {
+    const ev = makeEvent({
+      recurring: { freq: 'daily', until: '2026-01-11T00:00:00.000Z' },
+      start: '2026-01-10T09:00:00.000Z',
+      end: '2026-01-10T09:30:00.000Z'
+    });
+    const occ = expandEvent(ev, '2026-01-10T00:00:00.000Z', '2026-01-15T00:00:00.000Z');
+    expect(occ).toHaveLength(1); // 10 فقط — حادثة 11 بعد until
+  });
+
+  it('حدث متكرر بدأ قبل النطاق يظهر فيه (لن يضيع درس أسبوعي قديم)', () => {
+    const ev = makeEvent({
+      recurring: { freq: 'weekly' },
+      start: '2025-12-06T09:00:00.000Z',
+      end: '2025-12-06T10:00:00.000Z'
+    });
+    const occ = expandEvent(ev, '2026-01-10T00:00:00.000Z', '2026-01-18T00:00:00.000Z');
+    expect(occ.map((o) => o.start.slice(0, 10))).toContain('2026-01-10');
+    expect(occ.map((o) => o.start.slice(0, 10))).toContain('2026-01-17');
+  });
+
+  it('eventsForDay يرتب الأحداث زمنيًا داخل اليوم المحلي', () => {
+    const events = [
+      makeEvent({ id: 'late', start: '2026-01-10T14:00:00.000Z', end: '2026-01-10T15:00:00.000Z' }),
+      makeEvent({ id: 'early', start: '2026-01-10T07:00:00.000Z', end: '2026-01-10T08:00:00.000Z' })
+    ];
+    const day = eventsForDay(events, '2026-01-10');
+    expect(day.map((o) => o.event.id)).toEqual(['early', 'late']);
+  });
+
+  it('أسبوع من السبت: 7 أيام مرتبة والأحداث تتوزع على أيامها', () => {
+    // 2026-01-10 يوم سبت فعليًا
+    expect(addDaysKey('2026-01-10', 1)).toBe('2026-01-11');
+    const days = weekDayKeys('2026-01-10');
+    expect(days).toHaveLength(7);
+    expect(days[0]).toBe('2026-01-10');
+    expect(days[6]).toBe('2026-01-16');
+
+    const events = [
+      makeEvent({ id: 'a', start: '2026-01-11T09:00:00.000Z', end: '2026-01-11T10:00:00.000Z' })
+    ];
+    const byDay = eventsForWeek(events, '2026-01-10');
+    expect(byDay.get('2026-01-10')).toHaveLength(0);
+    expect(byDay.get('2026-01-11')).toHaveLength(1);
+    expect(byDay.get('2026-01-16')).toHaveLength(0);
+  });
+
+  it('expandEvents يرتب كل الحدوثات عبر أحداث متعددة زمنيًا', () => {
+    const events = [
+      makeEvent({ id: 'b', start: '2026-01-10T12:00:00.000Z', end: '2026-01-10T13:00:00.000Z' }),
+      makeEvent({
+        id: 'a',
+        recurring: { freq: 'daily' },
+        start: '2026-01-10T07:00:00.000Z',
+        end: '2026-01-10T08:00:00.000Z'
+      })
+    ];
+    const occ = expandEvents(events, '2026-01-10T00:00:00.000Z', '2026-01-11T00:00:00.000Z');
+    expect(occ.map((o) => o.event.id)).toEqual(['a', 'b']);
+  });
+
+  it('formatEventTime يعرض HH:MM–HH:MM', () => {
+    expect(formatEventTime('2026-01-10T09:05:00.000Z', '2026-01-10T10:30:00.000Z')).toMatch(/^\d{2}:\d{2}–\d{2}:\d{2}$/);
+  });
+
+  it('localDateTimeISO يحوّل التاريخ والوقت المحليين إلى ISO صحيح', () => {
+    const iso = localDateTimeISO('2026-01-10', '14:30');
+    const d = new Date(iso);
+    expect(d.getHours()).toBe(14);
+    expect(d.getMinutes()).toBe(30);
+    expect(iso.slice(0, 10)).toBe('2026-01-10');
   });
 });

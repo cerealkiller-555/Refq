@@ -12,7 +12,8 @@ import {
   learningPathRepository,
   noteRepository,
   folderRepository,
-  prayerAnchorRepository
+  prayerAnchorRepository,
+  calendarRepository
 } from '../src/core/db/repositories';
 import { db } from '../src/core/db/schema';
 
@@ -187,5 +188,48 @@ describe('Refq Database', () => {
 
     await prayerAnchorRepository.clearDate(day);
     expect(await prayerAnchorRepository.getForDate(day)).toHaveLength(0);
+  });
+
+  it('Calendar Repo P2 — getBetween وربط المهام وحذف الأحداث المرنة المربوطة', async () => {
+    const task = await taskRepository.create({
+      title: 'مهمة مجدولة',
+      importance: 'low',
+      urgency: 'low',
+      estimatedDuration: 60,
+      status: 'todo'
+    } as Parameters<typeof taskRepository.create>[0]);
+
+    // حدث ثابت وحدث مرن مربوط بالمهمة
+    const fixed = await calendarRepository.create({
+      title: 'محاضرة ثابتة',
+      kind: 'fixed',
+      start: '2026-01-12T08:00:00.000Z',
+      end: '2026-01-12T09:30:00.000Z'
+    } as Parameters<typeof calendarRepository.create>[0]);
+
+    const flexible = await calendarRepository.create({
+      title: 'مهمة مجدولة',
+      kind: 'flexible',
+      start: '2026-01-12T10:00:00.000Z',
+      end: '2026-01-12T11:00:00.000Z',
+      linkedTaskId: task.id
+    } as Parameters<typeof calendarRepository.create>[0]);
+
+    // getBetween — نطاق يشمل الاثنين
+    const between = await calendarRepository.getBetween('2026-01-12T00:00:00.000Z', '2026-01-13T00:00:00.000Z');
+    expect(between.map((e) => e.id).sort()).toEqual([fixed.id, flexible.id].sort());
+    // نطاق لا يشمل
+    expect(await calendarRepository.getBetween('2026-01-14T00:00:00.000Z', '2026-01-15T00:00:00.000Z')).toHaveLength(0);
+
+    // getByLinkedTask
+    const linked = await calendarRepository.getByLinkedTask(task.id);
+    expect(linked).toHaveLength(1);
+    expect(linked[0].kind).toBe('flexible');
+
+    // الحذف المرن: يحذف المرن المربوط فقط ولا يلمس الثابت
+    await calendarRepository.deleteFlexibleByLinkedTask(task.id);
+    expect(await calendarRepository.get(flexible.id)).toBeUndefined();
+    expect(await calendarRepository.get(fixed.id)).toBeDefined();
+    expect(await calendarRepository.getByLinkedTask(task.id)).toHaveLength(0);
   });
 });
