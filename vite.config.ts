@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 // رِفق — Vite configuration
 // DEPLOY_BASE (مثل /Refq/) يُضبط في CI فقط للنشر على GitHub Pages — التطوير المحلي يبقى على '/'
-const base = process.env.DEPLOY_BASE ?? '/';
+const base = process.env.DEPLOY_BASE || '/';
 
 export default defineConfig({
   base,
