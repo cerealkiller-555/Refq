@@ -6,3 +6,4 @@ export * from './priorityEngine';
 export * from './suggestionEngine';
 export * from './dayPeriods';
 export * from './recoveryEngine';
+export * from './calendarEngine';
