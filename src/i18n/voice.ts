@@ -35,8 +35,7 @@ export const voice = {
       after: 'أنتِ الآن بعد {current}',
       before: 'الآن قبل {next} (ليل)',
       nightOpen: 'الآن ليل — وقت مفتوح 🌙',
-      remaining: '{next} بعد {minutes} دقيقة 🤍',
-      remainingS: '{next} بعد دقيقة 🤍',
+      remaining: '{next} بعد {duration} 🤍',
       afterNext: 'بعد {next}',
       finalGuard: 'مواقيت اليوم من خدمة مواقيت الصلاة — تُحدَّث تلقائيًا، والصلوات لا تُقدَّم ولا تُحرَّك أبدًا.'
     },

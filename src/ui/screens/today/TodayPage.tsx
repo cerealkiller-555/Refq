@@ -11,6 +11,7 @@ import { describeReason } from '../../../core/engines/priorityEngine';
 import { PRAYER_LABELS } from '../../../core/engines/dayPeriods';
 import { isLearningItem } from '../../../core/engines/suggestionEngine';
 import { voice, greetingForHour } from '../../../i18n/voice';
+import { formatMinutesArabic } from '../../../utils';
 import { Card, Button, Chip, EmptyState } from '../../components';
 import type { CurrentPeriod } from '../../../core/engines/dayPeriods';
 
@@ -34,12 +35,12 @@ function periodLabel(p: CurrentPeriod): string {
   return voice.today.period.after.replace('{current}', currentLabel);
 }
 
-/** المدة المتبقية حتى المرساة القادمة إن كانت الفترة مقيّدة */
+/** المدة المتبقية حتى المرساة القادمة — بالساعات والدقائق (مثل: "ساعة و15 دقيقة") */
 function remainingLabel(nextLabel: string | undefined, minutes: number | null): string | null {
   if (!nextLabel || minutes === null) return null;
-  return minutes === 1
-    ? voice.today.period.remainingS.replace('{next}', nextLabel)
-    : voice.today.period.remaining.replace('{next}', nextLabel).replace('{minutes}', String(minutes));
+  return voice.today.period.remaining
+    .replace('{next}', nextLabel)
+    .replace('{duration}', formatMinutesArabic(minutes));
 }
 
 export function TodayPage() {

@@ -20,6 +20,8 @@ export function todayISODate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+export { formatMinutesArabic } from './format';
+
 /** مفتاح التاريخ المحلي (YYYY-MM-DD) — صحيح لتطبيق شخصي local-first */
 export function localDateKey(d: Date = new Date()): string {
   const y = d.getFullYear();
