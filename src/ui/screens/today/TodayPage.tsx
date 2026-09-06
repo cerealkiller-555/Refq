@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { useTodayStore } from '../../../core/store/useTodayStore';
 import { describeReason } from '../../../core/engines/priorityEngine';
 import { PRAYER_LABELS } from '../../../core/engines/dayPeriods';
+import { isLearningItem } from '../../../core/engines/suggestionEngine';
 import { voice, greetingForHour } from '../../../i18n/voice';
 import { Card, Button, Chip, EmptyState } from '../../components';
 import type { CurrentPeriod } from '../../../core/engines/dayPeriods';
@@ -54,6 +55,7 @@ export function TodayPage() {
   const completeTask = useTodayStore((s) => s.completeTask);
   const deleteTask = useTodayStore((s) => s.deleteTask);
   const updateTask = useTodayStore((s) => s.updateTask);
+  const startSuggestedItem = useTodayStore((s) => s.startSuggestedItem);
   const clearSuggestion = useTodayStore((s) => s.clearSuggestion);
   const anchors = useTodayStore((s) => s.anchors);
   const currentPeriod = useTodayStore((s) => s.currentPeriod);
@@ -82,8 +84,9 @@ export function TodayPage() {
 
   const startSuggested = () => {
     if (!suggestion?.task) return;
-    const id = suggestion.task.id;
-    void updateTask(id, { status: 'in_progress' });
+    const item = suggestion.task;
+    // خطوة تعليمية تُبدأ في مسارها — لا تُنشأ منها مهمة مكرّرة
+    void startSuggestedItem(item.id, isLearningItem(item) ? 'learning' : 'task');
     clearSuggestion();
   };
 
@@ -194,11 +197,18 @@ export function TodayPage() {
         )}
         {suggestion?.task && (
           <div className="suggestion-result">
-            <p className="suggestion-title">📌 {suggestion.task.title}</p>
-            <p className="muted">
-              ⏱ {suggestion.task.estimatedDuration} {voice.today.suggestion.minutes}
+            <p className="suggestion-title">
+              {isLearningItem(suggestion.task) ? '🌱' : '📌'} {suggestion.task.title}
             </p>
+            {suggestion.task.estimatedDuration != null && (
+              <p className="muted">
+                ⏱ {suggestion.task.estimatedDuration} {voice.today.suggestion.minutes}
+              </p>
+            )}
             <div className="reason-chips">
+              {isLearningItem(suggestion.task) && suggestion.task.sourceLabel && (
+                <Chip>🎓 {suggestion.task.sourceLabel}</Chip>
+              )}
               <Chip>{suggestion.reason}</Chip>
             </div>
             <div className="row" style={{ marginTop: 'var(--space-3)' }}>

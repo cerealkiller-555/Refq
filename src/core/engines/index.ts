@@ -7,3 +7,4 @@ export * from './suggestionEngine';
 export * from './dayPeriods';
 export * from './recoveryEngine';
 export * from './calendarEngine';
+export * from './learningEngine';

@@ -107,7 +107,35 @@ export const voice = {
     placeholder: 'قسم القلب — أثر، فتش عن قلبك، وقفة، محاسبة. يُبنى في مرحلته الخاصة بلطف.'
   },
   learning: {
-    placeholder: 'مسارات التعلم — تُبنى في مرحلتها.'
+    title: '🎓 رحلتي',
+    addPathTitle: 'مسار جديد',
+    pathName: 'اسم المسار (مثل: مادة المحاسبة)',
+    pathType: 'نوع المسار',
+    types: {
+      university: '🎓 جامعة',
+      course: '📚 كورس',
+      sharia_course: '🕌 دورة شرعية',
+      book: '📖 كتاب',
+      quran: '📖 قرآن',
+      sharia_knowledge: '📖 معرفة شرعية'
+    } as Record<string, string>,
+    addPath: 'أضيفي المسار',
+    nextStepTitle: 'خطوتك القادمة',
+    nextStepHint: 'ما الذي ستُكملينه بعد ذلك في هذا المسار؟',
+    noNext: 'مافيش عناصر جاية هنا — كله تمام 🤍',
+    itemsTitle: 'عناصر المسار',
+    addItemPlaceholder: 'عنصر جديد… (مثل: محاضرة 3)',
+    addItem: 'إضافة',
+    doneCount: 'مُنجز',
+    sessions: 'جلسات',
+    addSession: 'سجّلي جلسة',
+    sessionOf: 'جلسة على',
+    empty: 'ابدئي رحلتك بإضافة مسار تعليمي صغير — خطوة واحدة تكفي للبداية 🤍',
+    emptyItems: 'لا عناصر بعد — أضيفي أول خطوة بهدوء.',
+    progressLabel: 'أُنجز {done} من {total}',
+    pause: 'إيقاف مؤقت',
+    activate: 'متابعة',
+    noActiveHint: 'أضيفي مسارًا نشطًا وستظهر خطواته هنا.'
   },
   vault: {
     placeholder: 'مكتبة المعرفة — تُبنى في مرحلتها.'

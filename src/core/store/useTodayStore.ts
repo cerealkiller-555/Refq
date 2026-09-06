@@ -5,10 +5,17 @@
 // ============================================================
 
 import { create } from 'zustand';
-import { energyCheckinRepository, prayerAnchorRepository, taskRepository } from '../db/repositories';
+import {
+  energyCheckinRepository,
+  learningPathRepository,
+  pathItemRepository,
+  prayerAnchorRepository,
+  taskRepository
+} from '../db/repositories';
 import type { TaskRecord, EnergyLevel, PrayerAnchor } from '../types';
 import { getTopPriorities } from '../engines/priorityEngine';
-import { suggestTask, type SuggestionResult } from '../engines/suggestionEngine';
+import { suggestTask, type SuggestionResult, type Suggestable } from '../engines/suggestionEngine';
+import { nextSteps } from '../engines/learningEngine';
 import { getCurrentPeriod, PRAYER_LABELS, type CurrentPeriod } from '../engines/dayPeriods';
 import { localDateKey } from '../../utils';
 import { fetchPrayerAnchors } from '../services/prayerTimesService';
@@ -26,6 +33,8 @@ interface TodayState {
   loadToday: () => Promise<void>;
   checkIn: (level: EnergyLevel, note?: string, wantsLightDay?: boolean) => Promise<void>;
   askSuggestion: (availableMinutes: number) => Promise<void>;
+  /** بدء العنصر المقترح — مهمة عادية أو خطوة تعليمية في مسار */
+  startSuggestedItem: (id: string, kind?: 'task' | 'learning') => Promise<void>;
   addQuickTask: (title: string, minutes?: number) => Promise<void>;
   completeTask: (id: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
@@ -123,7 +132,24 @@ export const useTodayStore = create<TodayState>((set, get) => {
       const tasks = await taskRepository.getOpenTasks();
       const energy = (await energyCheckinRepository.getToday())?.level;
       const current = get().currentPeriod;
-      const suggestion = suggestTask(tasks, {
+
+      // خطوات التعلّم القادمة تُرشَّح للاقتراح كذلك (المسارات النشطة فقط)
+      // فشل القراءة (قاعدة مغلقة/لا مسارات) لا يمنع اقتراح المهام أبدًا.
+      let learningSuggestables: Suggestable[] = [];
+      try {
+        const paths = (await learningPathRepository.getAll()).filter((p) => p.status === 'active');
+        const itemsByPath: Record<string, Awaited<ReturnType<typeof pathItemRepository.getByPath>>> = {};
+        await Promise.all(
+          paths.map(async (p) => {
+            itemsByPath[p.id] = await pathItemRepository.getByPath(p.id);
+          })
+        );
+        learningSuggestables = nextSteps(paths, itemsByPath).map((s) => s.suggestable);
+      } catch {
+        learningSuggestables = [];
+      }
+
+      const suggestion = suggestTask([...tasks, ...learningSuggestables], {
         availableMinutes,
         energy,
         period: current
@@ -136,6 +162,17 @@ export const useTodayStore = create<TodayState>((set, get) => {
           : undefined
       });
       set({ tasks, suggestion });
+    },
+
+    startSuggestedItem: async (id, kind = 'task') => {
+      if (kind === 'learning') {
+        // خطوة تعليمية — تُحدَّث في مسارها، لا تُنشأ منها مهمة مكرّرة أبدًا
+        await pathItemRepository.update(id, { status: 'in_progress' });
+      } else {
+        await taskRepository.update(id, { status: 'in_progress' });
+      }
+      set({ suggestion: null });
+      await refresh();
     },
 
     addQuickTask: async (title, minutes = 15) => {
