@@ -113,10 +113,9 @@ export const voice = {
     types: {
       university: '🎓 جامعة',
       course: '📚 كورس',
-      sharia_course: '🕌 دورة شرعية',
+      sharia_course: '🕌 علم شرعي',
       book: '📖 كتاب',
-      quran: '📖 قرآن',
-      sharia_knowledge: '📖 معرفة شرعية'
+      quran: '📖 قرآن'
     } as Record<string, string>,
     addPath: 'أضيفي المسار',
     nextStepTitle: 'خطوتك القادمة',

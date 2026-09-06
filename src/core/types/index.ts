@@ -59,8 +59,7 @@ export type LearningPathType =
   | 'course'
   | 'sharia_course'
   | 'book'
-  | 'quran'
-  | 'sharia_knowledge';
+  | 'quran';
 
 export type LearningPathStatus = 'active' | 'paused' | 'done';
 

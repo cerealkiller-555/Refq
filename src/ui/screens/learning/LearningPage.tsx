@@ -18,8 +18,7 @@ const PATH_TYPES: LearningPathType[] = [
   'course',
   'sharia_course',
   'book',
-  'quran',
-  'sharia_knowledge'
+  'quran'
 ];
 
 interface ItemFormProps {
