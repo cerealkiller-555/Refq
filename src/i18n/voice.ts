@@ -30,6 +30,16 @@ export const voice = {
       again: 'اقتراح آخر',
       inProgressBadge: 'جارية'
     },
+    period: {
+      between: 'أنتِ الآن بين {current} و{next}',
+      after: 'أنتِ الآن بعد {current}',
+      before: 'الآن قبل {next} (ليل)',
+      nightOpen: 'الآن ليل — وقت مفتوح 🌙',
+      remaining: '{next} بعد {minutes} دقيقة 🤍',
+      remainingS: '{next} بعد دقيقة 🤍',
+      afterNext: 'بعد {next}',
+      finalGuard: 'مواقيت اليوم من خدمة مواقيت الصلاة — تُحدَّث تلقائيًا، والصلوات لا تُقدَّم ولا تُحرَّك أبدًا.'
+    },
     quickCapture: {
       title: 'التقاط سريع',
       placeholder: 'خاطرة أو مهمة… اكتبيها واضغطي Enter'

@@ -8,10 +8,38 @@
 import { useEffect, useState } from 'react';
 import { useTodayStore } from '../../../core/store/useTodayStore';
 import { describeReason } from '../../../core/engines/priorityEngine';
+import { PRAYER_LABELS } from '../../../core/engines/dayPeriods';
 import { voice, greetingForHour } from '../../../i18n/voice';
 import { Card, Button, Chip, EmptyState } from '../../components';
+import type { CurrentPeriod } from '../../../core/engines/dayPeriods';
 
 const TIME_CHOICES = [15, 30, 45, 60];
+
+/** نص لطيف يعكس الفترة الحالية بين الصلوات (بلا ضغط) */
+function periodLabel(p: CurrentPeriod): string {
+  const { period } = p;
+  const anchor = period.anchor;
+  if (anchor === 'night') {
+    if (period.end) {
+      // ليل قبل الفجر — ينتهي بمرساة قادمة
+      const next = p.nextAnchor ? PRAYER_LABELS[p.nextAnchor.prayer] : '';
+      return voice.today.period.before.replace('{next}', next);
+    }
+    return voice.today.period.nightOpen;
+  }
+  const currentLabel = PRAYER_LABELS[anchor];
+  const nextLabel = p.nextAnchor ? PRAYER_LABELS[p.nextAnchor.prayer] : '';
+  if (nextLabel) return voice.today.period.between.replace('{current}', currentLabel).replace('{next}', nextLabel);
+  return voice.today.period.after.replace('{current}', currentLabel);
+}
+
+/** المدة المتبقية حتى المرساة القادمة إن كانت الفترة مقيّدة */
+function remainingLabel(nextLabel: string | undefined, minutes: number | null): string | null {
+  if (!nextLabel || minutes === null) return null;
+  return minutes === 1
+    ? voice.today.period.remainingS.replace('{next}', nextLabel)
+    : voice.today.period.remaining.replace('{next}', nextLabel).replace('{minutes}', String(minutes));
+}
 
 export function TodayPage() {
   const tasks = useTodayStore((s) => s.tasks);
@@ -27,6 +55,8 @@ export function TodayPage() {
   const deleteTask = useTodayStore((s) => s.deleteTask);
   const updateTask = useTodayStore((s) => s.updateTask);
   const clearSuggestion = useTodayStore((s) => s.clearSuggestion);
+  const anchors = useTodayStore((s) => s.anchors);
+  const currentPeriod = useTodayStore((s) => s.currentPeriod);
 
   const [quick, setQuick] = useState('');
   const [energyNote, setEnergyNote] = useState('');
@@ -70,6 +100,27 @@ export function TodayPage() {
         <h2>{greetingForHour(new Date().getHours())}</h2>
         <p className="muted">{voice.today.hint}</p>
       </header>
+
+      {/* الفترة الحالية بين الصلوات — بلا ضغط */}
+      {currentPeriod && (
+        <div className="period-banner" role="status">
+          <p className="period-line">{periodLabel(currentPeriod)}</p>
+          {remainingLabel(
+            currentPeriod.nextAnchor ? PRAYER_LABELS[currentPeriod.nextAnchor.prayer] : undefined,
+            currentPeriod.period.remainingMinutes
+          ) && (
+            <p className="period-remaining">{remainingLabel(
+              currentPeriod.nextAnchor ? PRAYER_LABELS[currentPeriod.nextAnchor.prayer] : undefined,
+              currentPeriod.period.remainingMinutes
+            )}</p>
+          )}
+        </div>
+      )}
+
+      {/* تذكير هادئ بأن مراسي اليوم من خدمة مواقيت الصلاة ولا تُحرَّك */}
+      {anchors.length > 0 && (
+        <p className="period-guard">{voice.today.period.finalGuard}</p>
+      )}
 
       {/* طاقة اليوم */}
       <Card title={voice.today.energy.title} icon="🌿">
@@ -117,11 +168,26 @@ export function TodayPage() {
           <>
             <p className="muted">{voice.today.suggestion.question}</p>
             <div className="time-row">
-              {TIME_CHOICES.map((m) => (
-                <Button key={m} variant="soft" onClick={() => void chooseTime(m)}>
-                  {m} {voice.today.suggestion.minutes}
-                </Button>
-              ))}
+              {TIME_CHOICES.map((m) => {
+                const disabled =
+                  currentPeriod?.period.remainingMinutes !== null &&
+                  currentPeriod?.period.remainingMinutes !== undefined &&
+                  m > currentPeriod.period.remainingMinutes;
+                const nextLabel = currentPeriod?.nextAnchor
+                  ? PRAYER_LABELS[currentPeriod.nextAnchor.prayer]
+                  : undefined;
+                return (
+                  <Button
+                    key={m}
+                    variant="soft"
+                    disabled={!!disabled}
+                    title={disabled && nextLabel ? voice.today.period.afterNext.replace('{next}', nextLabel) : undefined}
+                    onClick={() => void chooseTime(m)}
+                  >
+                    {m} {voice.today.suggestion.minutes}
+                  </Button>
+                );
+              })}
             </div>
             {asked && <p className="muted">…</p>}
           </>

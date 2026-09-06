@@ -32,9 +32,10 @@ interface ButtonProps {
   disabled?: boolean;
   type?: 'button' | 'submit';
   ariaLabel?: string;
+  title?: string;
 }
 
-export function Button({ children, onClick, variant = 'primary', disabled, type = 'button', ariaLabel }: ButtonProps) {
+export function Button({ children, onClick, variant = 'primary', disabled, type = 'button', ariaLabel, title }: ButtonProps) {
   return (
     <button
       type={type}
@@ -42,6 +43,7 @@ export function Button({ children, onClick, variant = 'primary', disabled, type 
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
+      title={title}
     >
       {children}
     </button>

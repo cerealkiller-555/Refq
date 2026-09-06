@@ -232,4 +232,31 @@ describe('Refq Database', () => {
     expect(await calendarRepository.get(fixed.id)).toBeDefined();
     expect(await calendarRepository.getByLinkedTask(task.id)).toHaveLength(0);
   });
+
+  it('Prayer Anchors P3 — replaceForDate يخزّن مراسي اليوم (source:service) ويبقون بعد تحميل جديد', async () => {
+    const day = '2026-09-08';
+    const anchors = await prayerAnchorRepository.replaceForDate(day, [
+      { date: day, prayer: 'fajr', time: '2026-09-08T04:50:00.000Z', source: 'service' },
+      { date: day, prayer: 'dhuhr', time: '2026-09-08T11:50:00.000Z', source: 'service' },
+      { date: day, prayer: 'asr', time: '2026-09-08T15:10:00.000Z', source: 'service' },
+      { date: day, prayer: 'maghrib', time: '2026-09-08T18:00:00.000Z', source: 'service' },
+      { date: day, prayer: 'isha', time: '2026-09-08T19:25:00.000Z', source: 'service' }
+    ]);
+
+    expect(anchors).toHaveLength(5);
+    expect(anchors.every((a) => a.source === 'service')).toBe(true);
+
+    // إعادة القراءة (محاكاة إعادة التحميل بعد الجلب) — persistence
+    const reloaded = await prayerAnchorRepository.getForDate(day);
+    expect(reloaded).toHaveLength(5);
+    expect(reloaded.map((a) => a.prayer).sort()).toEqual(['asr', 'dhuhr', 'fajr', 'isha', 'maghrib']);
+    expect(reloaded.find((a) => a.prayer === 'maghrib')?.time).toBe('2026-09-08T18:00:00.000Z');
+
+    // استبدال نفس اليوم يستبدل الكامل (لا تكرار)
+    const second = await prayerAnchorRepository.replaceForDate(day, [
+      { date: day, prayer: 'fajr', time: '2026-09-08T04:55:00.000Z', source: 'service' }
+    ]);
+    expect(second).toHaveLength(1);
+    expect(await prayerAnchorRepository.getForDate(day)).toHaveLength(1);
+  });
 });

@@ -507,6 +507,34 @@ select {
   font-size: var(--font-size-sm);
 }
 
+/* ===== P3 — فترات اليوم (Prayer Anchors) ===== */
+
+.period-banner {
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-2) 0 var(--space-4);
+  color: var(--color-primary-hover);
+}
+
+.period-line {
+  font-weight: 700;
+  font-size: var(--font-size-md);
+}
+
+.period-remaining {
+  margin-top: var(--space-1);
+  font-size: var(--font-size-sm);
+  opacity: 0.9;
+}
+
+.period-guard {
+  margin: var(--space-1) 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  opacity: 0.85;
+}
+
 /* ===== P2 — التقويم ===== */
 
 /* التبويبات */

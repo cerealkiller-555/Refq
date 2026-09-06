@@ -6,6 +6,7 @@
 
 import { db } from '../schema';
 import { BaseRepository } from './baseRepository';
+import { generateId, nowISO } from '../../../utils';
 import type { PrayerAnchor, PrayerKey } from '../../types';
 
 class PrayerAnchorRepository extends BaseRepository<PrayerAnchor> {
@@ -37,6 +38,22 @@ class PrayerAnchorRepository extends BaseRepository<PrayerAnchor> {
 
   async clearDate(date: string): Promise<void> {
     await this.table.where('date').equals(date).delete();
+  }
+
+  /**
+   * استبدال مراسي يوم كامل بجديدة (تُستخدم للجلب التلقائي؛ كلها source:'service').
+   * لا تحذف/تعدّل من الـUI أبدًا — الصلاة لا تُحرَّك ولا تُحذف.
+   */
+  async replaceForDate(date: string, anchors: Array<Omit<PrayerAnchor, 'id' | 'createdAt' | 'updatedAt'>>): Promise<PrayerAnchor[]> {
+    await this.table.where('date').equals(date).delete();
+    const records: PrayerAnchor[] = anchors.map((anchor) => ({
+      ...anchor,
+      id: generateId(),
+      createdAt: nowISO(),
+      updatedAt: nowISO()
+    }));
+    await this.table.bulkPut(records);
+    return records;
   }
 }
 

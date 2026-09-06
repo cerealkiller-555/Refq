@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { usePlanningStore } from '../src/core/store/usePlanningStore';
-import { taskRepository, calendarRepository } from '../src/core/db/repositories';
+import { taskRepository, calendarRepository, prayerAnchorRepository } from '../src/core/db/repositories';
 import { db } from '../src/core/db/schema';
 import { eventsForDay } from '../src/core/engines/calendarEngine';
 import type { TaskRecord } from '../src/core/types';
@@ -134,5 +134,39 @@ describe('Planning Store P2', () => {
     const day = eventsForDay(events, '2026-01-12');
     expect(day).toHaveLength(1);
     expect(day[0].event.title).toBe('مراجعة سريعة');
+  });
+
+  it('إعادة التوزيع (replan) لا تُحرّك مراسي الصلاة أبدًا — تُحذف ولا تُنقل ولا تتغير أوقاتها', async () => {
+    const day = new Date().toISOString().slice(0, 10);
+    // مراسٍ يومية من الخدمة (source:service) — مثلما يخزنها الـsync
+    const before = await prayerAnchorRepository.replaceForDate(day, [
+      { date: day, prayer: 'fajr', time: `${day}T04:50:00.000Z`, source: 'service' },
+      { date: day, prayer: 'dhuhr', time: `${day}T11:50:00.000Z`, source: 'service' },
+      { date: day, prayer: 'asr', time: `${day}T15:10:00.000Z`, source: 'service' },
+      { date: day, prayer: 'maghrib', time: `${day}T18:20:00.000Z`, source: 'service' },
+      { date: day, prayer: 'isha', time: `${day}T19:40:00.000Z`, source: 'service' }
+    ]);
+
+    // مهام متأخرة تستحق إعادة توزيع — والثوابت لا تُلمس أيضًا
+    await calendarRepository.create({
+      title: 'سيشن ثابت',
+      kind: 'fixed',
+      start: '2026-01-01T09:00:00.000Z',
+      end: '2026-01-01T11:00:00.000Z'
+    } as Parameters<typeof calendarRepository.create>[0]);
+    await makeTask({ estimatedDuration: 90 });
+    await makeTask({ estimatedDuration: 120 });
+
+    const plan = await usePlanningStore.getState().replan();
+    expect(plan.moved.length).toBeGreaterThanOrEqual(1);
+
+    // المراسي ثابتة كما هي: نفس العدد ونفس الصلوات ونفس المواعيد ونفس المصدر
+    const after = await prayerAnchorRepository.getForDate(day);
+    expect(after).toHaveLength(before.length);
+    expect(after.map((a) => a.prayer).sort()).toEqual(before.map((a) => a.prayer).sort());
+    expect(after.map((a) => a.time).sort()).toEqual(before.map((a) => a.time).sort());
+    expect(after.every((a) => a.source === 'service')).toBe(true);
+    // ولا تظهر في قائمة المتحرك إطلاقًا
+    expect(plan.moved.some((m) => m.taskId && m.taskId.startsWith('prayer'))).toBe(false);
   });
 });

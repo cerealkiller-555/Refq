@@ -6,11 +6,13 @@
 
 import { create } from 'zustand';
 import { energyCheckinRepository, prayerAnchorRepository, taskRepository } from '../db/repositories';
-import type { TaskRecord, EnergyLevel } from '../types';
+import type { TaskRecord, EnergyLevel, PrayerAnchor } from '../types';
 import { getTopPriorities } from '../engines/priorityEngine';
 import { suggestTask, type SuggestionResult } from '../engines/suggestionEngine';
-import { getCurrentPeriod, PRAYER_LABELS } from '../engines/dayPeriods';
+import { getCurrentPeriod, PRAYER_LABELS, type CurrentPeriod } from '../engines/dayPeriods';
 import { localDateKey } from '../../utils';
+import { fetchPrayerAnchors } from '../services/prayerTimesService';
+import { getCoordinates } from '../services/geo';
 
 interface TodayState {
   tasks: TaskRecord[];
@@ -18,6 +20,8 @@ interface TodayState {
   lightDay: boolean;
   topPriorities: TaskRecord[];
   suggestion: SuggestionResult | null;
+  anchors: PrayerAnchor[];
+  currentPeriod: CurrentPeriod | null;
   loaded: boolean;
   loadToday: () => Promise<void>;
   checkIn: (level: EnergyLevel, note?: string, wantsLightDay?: boolean) => Promise<void>;
@@ -27,6 +31,7 @@ interface TodayState {
   deleteTask: (id: string) => Promise<void>;
   updateTask: (id: string, changes: Partial<TaskRecord>) => Promise<void>;
   clearSuggestion: () => void;
+  syncPrayerAnchors: () => Promise<void>;
 }
 
 export const useTodayStore = create<TodayState>((set, get) => {
@@ -41,19 +46,60 @@ export const useTodayStore = create<TodayState>((set, get) => {
     });
   };
 
+  /** جلب مراسي اليوم مع fallback آمن — لا يُفشِل Today أبدًا */
+  const syncPrayerAnchorsInternal = async () => {
+    const dateKey = localDateKey();
+    let anchors: PrayerAnchor[] = [];
+
+    try {
+      const coords = await getCoordinates();
+      if (coords) {
+        const fetched = await fetchPrayerAnchors({ dateKey, lat: coords.lat, lon: coords.lon });
+        anchors = (await prayerAnchorRepository.replaceForDate(dateKey, fetched)) as PrayerAnchor[];
+      }
+    } catch {
+      anchors = [];
+    }
+
+    // fallback: لا إحداثيات/جلب فاشل ← آخر مواقيت محفوظة اليوم، أو لا شيء.
+    // قاعدة مغلقة أثناء الإقلاع/التنظيف لا تُفشِل أبدًا.
+    if (anchors.length === 0) {
+      try {
+        anchors = await prayerAnchorRepository.getForDate(dateKey);
+      } catch {
+        anchors = [];
+      }
+    }
+
+    set({
+      anchors,
+      currentPeriod: getCurrentPeriod(anchors, new Date().toISOString())
+    });
+  };
+
   return {
     tasks: [],
     todayEnergy: null,
     lightDay: false,
     topPriorities: [],
     suggestion: null,
+    anchors: [],
+    currentPeriod: null,
     loaded: false,
 
     loadToday: async () => {
-      const [tasks, energy] = await Promise.all([
-        taskRepository.getOpenTasks(),
-        energyCheckinRepository.getToday()
-      ]);
+      let tasks: TaskRecord[] = [];
+      let energy = null;
+      try {
+        const [loadedTasks, loadedEnergy] = await Promise.all([
+          taskRepository.getOpenTasks(),
+          energyCheckinRepository.getToday()
+        ]);
+        tasks = loadedTasks;
+        energy = loadedEnergy;
+      } catch {
+        // فشل قراءة (قاعدة مغلقة/خطأ) — نكمل بحالة فارغة بلا انهيار أبدًا
+      }
       set({
         tasks,
         todayEnergy: energy?.level ?? null,
@@ -61,7 +107,11 @@ export const useTodayStore = create<TodayState>((set, get) => {
         topPriorities: getTopPriorities(tasks, 3, undefined, energy?.level),
         loaded: true
       });
+      // جلب المواقيت (لا يعلق التحميل — نافذ/fallback في الخلفية)
+      await syncPrayerAnchorsInternal();
     },
+
+    syncPrayerAnchors: () => syncPrayerAnchorsInternal(),
 
     checkIn: async (level, note, wantsLightDay = false) => {
       const saved = await energyCheckinRepository.upsertToday(level, note, wantsLightDay);
@@ -72,8 +122,7 @@ export const useTodayStore = create<TodayState>((set, get) => {
     askSuggestion: async (availableMinutes) => {
       const tasks = await taskRepository.getOpenTasks();
       const energy = (await energyCheckinRepository.getToday())?.level;
-      const anchors = await prayerAnchorRepository.getForDate(localDateKey());
-      const current = getCurrentPeriod(anchors, new Date().toISOString());
+      const current = get().currentPeriod;
       const suggestion = suggestTask(tasks, {
         availableMinutes,
         energy,
