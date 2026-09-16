@@ -57,7 +57,7 @@ export interface CalendarEvent extends Timestamps {
 export type LearningPathType =
   | 'university'
   | 'course'
-  | 'sharia_course'
+  | 'religious_science'
   | 'book'
   | 'quran';
 

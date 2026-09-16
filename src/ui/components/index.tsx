@@ -33,13 +33,14 @@ interface ButtonProps {
   type?: 'button' | 'submit';
   ariaLabel?: string;
   title?: string;
+  size?: 'sm' | 'md';
 }
 
-export function Button({ children, onClick, variant = 'primary', disabled, type = 'button', ariaLabel, title }: ButtonProps) {
+export function Button({ children, onClick, variant = 'primary', disabled, type = 'button', ariaLabel, title, size = 'md' }: ButtonProps) {
   return (
     <button
       type={type}
-      className={`btn btn-${variant}`}
+      className={`btn btn-${variant}${size === 'sm' ? ' btn-sm' : ''}`}
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}

@@ -50,6 +50,7 @@
 
   /* خط */
   --font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif;
+  --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
   --font-size-md: 1rem;
   --font-size-lg: 1.25rem;
@@ -772,4 +773,156 @@ select {
 
 .learning-items .add-form {
   margin-top: var(--space-3);
+}
+
+/* ===== P4 — المعرفة (Vault) ===== */
+
+.btn-sm {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-size-xs);
+}
+
+.folder-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.folder-chip.folder-active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fffdf9;
+}
+
+.folder-delete {
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 var(--space-1);
+  opacity: 0.7;
+}
+
+.folder-delete:hover {
+  opacity: 1;
+  color: var(--color-danger);
+}
+
+.note-title-btn {
+  border: none;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  text-align: right;
+  padding: 0;
+}
+
+.note-title-btn:hover {
+  text-decoration: underline;
+}
+
+.vault-editor {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--font-size-sm);
+  line-height: 1.7;
+  direction: rtl;
+}
+
+.note-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  line-height: 1.8;
+  margin: var(--space-2) 0;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.backlinks {
+  margin-top: var(--space-3);
+  border-top: 1px dashed rgba(61, 58, 52, 0.15);
+  padding-top: var(--space-2);
+}
+
+.backlink-chip {
+  cursor: pointer;
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* ===== P5 — القلب (Heart) ===== */
+
+.banner {
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-2) 0;
+}
+
+.banner-gentle {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+.sharia-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.sharia-row {
+  background: var(--color-surface);
+  border: 1px solid rgba(61, 58, 52, 0.1);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.sharia-text {
+  font-size: var(--font-size-md);
+  line-height: 1.9;
+  margin: 0;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.history-row {
+  border-bottom: 1px dashed rgba(61, 58, 52, 0.12);
+  padding-bottom: var(--space-2);
+}
+
+.history-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+/* وسم مُختار (فتش عن قلبك) */
+.chip-selected {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fffdf9;
+}
+
+/* معاينة الملاحظة في المعرفة (نص خام كما هو) */
+.vault-preview {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  line-height: 1.9;
+  margin: var(--space-2) 0;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  max-height: 360px;
+  overflow-y: auto;
 }

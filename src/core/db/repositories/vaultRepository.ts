@@ -22,8 +22,8 @@ class NoteRepository extends BaseRepository<Note> {
   }
 
   /** تحديث Markdown — التغيير الجوهري، يلمس المصدر فقط */
-  async updateMarkdown(id: string, rawMarkdown: string, title?: string): Promise<Note | undefined> {
-    return this.update(id, { rawMarkdown, title } as Partial<Note>);
+  async updateMarkdown(id: string, rawMarkdown: string, title?: string, folderId?: string): Promise<Note | undefined> {
+    return this.update(id, { rawMarkdown, title, folderId } as Partial<Note>);
   }
 
   async getByFolder(folderId?: string): Promise<Note[]> {
@@ -43,6 +43,12 @@ class NoteRepository extends BaseRepository<Note> {
       )
       .toArray();
   }
+
+  /** حذف ملاحظة مع فهرسها (cascade) — المشتقات لا تبقى يتيمة */
+  async deleteNote(id: string): Promise<void> {
+    await this.table.delete(id);
+    await db.noteIndexes.delete(id);
+  }
 }
 
 class FolderRepository extends BaseRepository<Folder> {
@@ -59,6 +65,12 @@ class FolderRepository extends BaseRepository<Folder> {
       return this.table.filter((f) => !f.parentId).toArray();
     }
     return this.table.where('parentId').equals(folderId).toArray();
+  }
+
+  /** حذف مجلد: ملاحظاته تصبح غير مصنّفة (لا تُحذف أبدًا) */
+  async deleteFolder(folderId: string): Promise<void> {
+    await db.notes.where('folderId').equals(folderId).modify({ folderId: undefined });
+    await this.table.delete(folderId);
   }
 }
 

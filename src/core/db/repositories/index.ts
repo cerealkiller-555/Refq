@@ -10,4 +10,5 @@ export * from './learningRepository';
 export * from './vaultRepository';
 export * from './heartRepository';
 export * from './systemRepository';
+export * from './shariaRepository';
 export * from './prayerAnchorRepository';

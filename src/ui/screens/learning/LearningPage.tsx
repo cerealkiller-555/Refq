@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { useLearningStore } from '../../../core/store/useLearningStore';
+import { useVaultStore } from '../../../core/store/useVaultStore';
 import { pathProgress } from '../../../core/engines/learningEngine';
 import { voice } from '../../../i18n/voice';
 import { Card, Button, Chip, EmptyState } from '../../components';
@@ -16,7 +17,7 @@ const L = voice.learning;
 const PATH_TYPES: LearningPathType[] = [
   'university',
   'course',
-  'sharia_course',
+  'religious_science',
   'book',
   'quran'
 ];
@@ -89,9 +90,12 @@ function PathCard({ path }: { path: LearningPath }) {
   const load = useLearningStore((s) => s.load);
   const addSession = useLearningStore((s) => s.addSession);
   const sessions = useLearningStore((s) => s.sessions);
+  const linkNoteToItem = useLearningStore((s) => s.linkNoteToItem);
+  const vaultNotes = useVaultStore((s) => s.notes);
 
   const [showItemForm, setShowItemForm] = useState(false);
   const [sessionFor, setSessionFor] = useState<PathItem | null>(null);
+  const [linkingFor, setLinkingFor] = useState<PathItem | null>(null);
 
   useEffect(() => {
     void getItemsForPath(path.id);
@@ -111,6 +115,11 @@ function PathCard({ path }: { path: LearningPath }) {
     } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
     setSessionFor(null);
     await load();
+  };
+
+  const linkedNoteTitle = (itemId: string) => {
+    const noteId = items.find((i) => i.id === itemId)?.linkedNoteId;
+    return noteId ? vaultNotes.find((n) => n.id === noteId)?.title : undefined;
   };
 
   return (
@@ -151,6 +160,35 @@ function PathCard({ path }: { path: LearningPath }) {
         </div>
       )}
 
+      {/* ربط ملاحظة من المعرفة بهذا العنصر */}
+      {linkingFor && (
+        <div className="session-prompt">
+          <p>📎 اربطي ملاحظة من المعرفة بـ «{linkingFor.title}»:</p>
+          {vaultNotes.length === 0 ? (
+            <p className="muted">{voice.vault.noNotes}</p>
+          ) : (
+            <select
+              className="text-input"
+              aria-label={voice.vault.noteTitle}
+              defaultValue=""
+              onChange={(e) => {
+                const noteId = e.target.value || null;
+                if (noteId) void linkNoteToItem(linkingFor.id, noteId);
+                setLinkingFor(null);
+              }}
+            >
+              <option value="">— اختاري —</option>
+              {vaultNotes.map((n) => (
+                <option key={n.id} value={n.id}>
+                  {n.title}
+                </option>
+              ))}
+            </select>
+          )}
+          <Button variant="ghost" onClick={() => setLinkingFor(null)}>{voice.common.cancel}</Button>
+        </div>
+      )}
+
       {/* عناصر المسار */}
       <div className="learning-items">
         <p className="section-divider">{L.itemsTitle}</p>
@@ -175,6 +213,19 @@ function PathCard({ path }: { path: LearningPath }) {
                   {item.estimatedDuration ? `${item.estimatedDuration} ${voice.today.suggestion.minutes}` : ''}
                   {itemSessions(item.id) > 0 ? ` · ${itemSessions(item.id)} ${L.sessions}` : ''}
                 </span>
+                {item.linkedNoteId && linkedNoteTitle(item.id) && (
+                  <Chip>📎 {linkedNoteTitle(item.id)}</Chip>
+                )}
+                {item.status !== 'done' && (
+                  <button
+                    className="task-schedule"
+                    aria-label="📎 ربط ملاحظة"
+                    title="📎 ربط ملاحظة"
+                    onClick={() => setLinkingFor(item)}
+                  >
+                    📎
+                  </button>
+                )}
                 <button className="task-delete" aria-label={voice.common.delete} onClick={() => void deleteItem(item.id)}>
                   ×
                 </button>
@@ -212,6 +263,8 @@ export function LearningPage() {
 
   useEffect(() => {
     void load();
+    // ملاحظات المعرفة — لعرض أسمائها في ربط العناصر 📎
+    void useVaultStore.getState().load();
   }, [load]);
 
   const submit = async () => {

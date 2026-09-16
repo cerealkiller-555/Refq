@@ -29,6 +29,8 @@ interface LearningState {
   getSessionsForItem: (itemId: string) => Promise<Session[]>;
   /** الخطوة القادمة لكل مسار نشط — يعيد حساباتها الانتقالية كلما تغيّر العنصر */
   getNextSteps: () => Promise<NextStep[]>;
+  /** ربط عنصر مسار بملاحظة من المعرفة (أو فك الربط بـ null) */
+  linkNoteToItem: (itemId: string, noteId: string | null) => Promise<void>;
 }
 
 export const useLearningStore = create<LearningState>((set, get) => ({
@@ -111,5 +113,11 @@ export const useLearningStore = create<LearningState>((set, get) => ({
 
   getNextSteps: async () => {
     return nextSteps(get().paths, get().itemsByPath);
+  },
+
+  linkNoteToItem: async (itemId, noteId) => {
+    await pathItemRepository.update(itemId, { linkedNoteId: noteId ?? undefined });
+    const item = await pathItemRepository.get(itemId);
+    if (item?.pathId) await get().getItemsForPath(item.pathId);
   }
 }));

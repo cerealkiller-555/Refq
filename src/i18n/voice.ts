@@ -103,7 +103,71 @@ export const voice = {
     }
   },
   heart: {
-    placeholder: 'قسم القلب — أثر، فتش عن قلبك، وقفة، محاسبة. يُبنى في مرحلته الخاصة بلطف.'
+    title: '🤍 القلب',
+    tabs: { athar: 'أثر', search_heart: 'فتش عن قلبك', waqfa: 'وقفة', muhasaba: 'محاسبة', sharia: 'نصوص شرعية' },
+    athar: {
+      title: 'أثر — ماذا بعد ما أنهيتِ خطوة؟',
+      hint: 'خصّيصة صغيرة بعد إنجاز خطوة تعليمية — بلا ضغط.',
+      prompt: 'كيف شعرتِ بعد ما أنهيتِ الخطوة؟',
+      benefit: 'هل خرجتِ بفائدة أو فكرة؟',
+      save: 'سجّلي الأثر',
+      done: 'سجّلي أثرك 🤍',
+      skip: 'مش دلوقتي',
+      afterItem: 'بعد إنهاء: {item}'
+    },
+    search_heart: {
+      title: 'فتش عن قلبك',
+      hint: 'سؤال دوري هادئ — مجرد تأمل، بلا تقييم.',
+      prompt: 'ماذا تحتاجين الآن؟',
+      options: ['راحة', 'تركيز', 'دفء', 'وضوح', 'شيء آخر'],
+      save: 'سجّلي',
+      saved: 'سجّلي ما تحتاجينه 🤍',
+      skip: 'تخطي'
+    },
+    waqfa: {
+      title: 'وقفة — لحظة تأمل أسبوعية',
+      hint: 'خصيصة أسبوعية — تُطرح مرة واحدة في الأسبوع.',
+      prompt: 'كيف كان أسبوعك؟',
+      wins: 'أبرز نجاح أو لحظة جميلة؟',
+      challenge: 'ما أصعب شيء واجهتِه؟',
+      nextWeek: 'ما أولويتك للأسبوع الجاي؟',
+      save: 'سجّلي الوقفة',
+      saved: 'سجّلي وقفتك الأسبوعية 🤍',
+      skip: 'مش دلوقتي'
+    },
+    muhasaba: {
+      title: 'محاسبة — تأمل اختياري',
+      hint: 'محاسبة ذاتية هادئة — بدون أحكام.',
+      prompt: 'ماذا فعلتِ اليوم لترضين عن نفسك؟',
+      improvement: 'ما الذي تتمنين تحسينه بهدوء؟',
+      save: 'سجّلي المحاسبة',
+      saved: 'سجّلي محاسبتك 🤍',
+      skip: 'مش دلوقتي'
+    },
+    sharia: {
+      title: 'نصوص شرعية',
+      hint: 'نص شرعي يلمس قلبك — آية أو حديث أو فائدة، والمصدر دائمًا مذكور.',
+      addText: 'أضيفي نص',
+      kind: 'النوع',
+      text: 'النص',
+      source: 'المصدر',
+      linkPathLabel: 'مرتبط بمسار',
+      noPath: 'بدون ربط',
+      kinds: {
+        ayah: 'آية',
+        hadith: 'حديث',
+        scholar_quote: 'قول عالم',
+        faida: 'فائدة',
+        tarif: 'تعريف'
+      } as Record<string, string>,
+      save: 'حفظ',
+      cancel: 'إلغاء',
+      empty: 'لا نصوص بعد — أضيفي آية أو حديث أو فائدة 🤍',
+      linkedPath: 'مرتبط بمسار: {path}'
+    },
+    history: 'السجل',
+    noHistory: 'لا سجل بعد — سجّلي أول تأمل 🤍',
+    todayDone: 'سجّلي اليوم — تقدري تعودي غدًا 🤍'
   },
   learning: {
     title: '🎓 رحلتي',
@@ -113,7 +177,7 @@ export const voice = {
     types: {
       university: '🎓 جامعة',
       course: '📚 كورس',
-      sharia_course: '🕌 علم شرعي',
+      religious_science: '🕌 علم شرعي',
       book: '📖 كتاب',
       quran: '📖 قرآن'
     } as Record<string, string>,
@@ -136,7 +200,32 @@ export const voice = {
     noActiveHint: 'أضيفي مسارًا نشطًا وستظهر خطواته هنا.'
   },
   vault: {
-    placeholder: 'مكتبة المعرفة — تُبنى في مرحلتها.'
+    title: '🧠 المعرفة',
+    newNote: 'ملاحظة جديدة',
+    searchPlaceholder: 'ابحثي في الملاحظات والعناوين…',
+    allFolder: 'الكل',
+    unfiled: 'غير مصنّفة',
+    newFolder: 'مجلد جديد',
+    foldersTitle: 'المجلدات',
+    folderPlaceholder: 'اسم المجلد',
+    save: 'حفظ',
+    cancel: 'إلغاء',
+    edit: 'تعديل',
+    deleteConfirm: 'نحذف هذه الملاحظة؟ لا رجوع بعدها.',
+    noteTitle: 'عنوان الملاحظة',
+    noteBody: 'المحتوى (Markdown — [[روابط]] و#وسوم تعمل)',
+    backlinks: 'روابط عائدة',
+    noBacklinks: 'لا روابط عائدة بعد — اذكريها بـ[[العنوان]] في ملاحظة أخرى.',
+    openBacklink: 'افتحيها',
+    tagsLabel: 'وسوم',
+    linkedPathItem: 'مرتبطة بخطوة: {item}',
+    exportZip: '⬇ تصدير الكل (zip)',
+    exportNote: '⬇ .md',
+    rebuild: 'إعادة بناء الفهرس',
+    rebuilt: 'أُعيد بناء الفهرس من الـMarkdown — المصدر دائمًا هو النص نفسه 🤍',
+    noNotes: 'لا ملاحظات هنا — اكتبي أول فائدة أو خاطرة 🤍',
+    noResults: 'لا نتائج مطابقة — جرّبي كلمة أخرى.',
+    notesCount: '{count} ملاحظة'
   },
   common: {
     complete: 'إنجاز',

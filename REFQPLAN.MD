@@ -120,7 +120,7 @@ CalendarEvent {
 // ===== Learning =====
 LearningPath {
   id, title, description?,
-  type: 'university' | 'course' | 'sharia_course' | 'book' | 'quran' | 'sharia_knowledge',
+  type: 'university' | 'course' | 'religious_science' | 'book' | 'quran',
   status: 'active' | 'paused' | 'done',
   order: number, createdAt
 }
