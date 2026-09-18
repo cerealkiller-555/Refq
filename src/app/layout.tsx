@@ -9,7 +9,6 @@ const NAV_ITEMS = [
   { to: '/', label: 'اليوم', icon: '🏠' },
   { to: '/planning', label: 'التخطيط', icon: '📅' },
   { to: '/learning', label: 'رحلتي', icon: '🎓' },
-  { to: '/vault', label: 'المعرفة', icon: '🧠' },
   { to: '/heart', label: 'القلب', icon: '🤍' },
   { to: '/settings', label: 'النظام', icon: '⚙️' }
 ];

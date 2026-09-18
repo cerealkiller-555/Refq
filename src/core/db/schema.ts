@@ -11,9 +11,6 @@ import type {
   LearningPath,
   PathItem,
   Session,
-  Note,
-  NoteIndex,
-  Folder,
   ReflectionEntry,
   EnergyCheckin,
   ShariaText,
@@ -23,7 +20,7 @@ import type {
 } from '../types';
 
 const DB_NAME = 'refq';
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 const V1_STORES = {
   tasks: 'id, status, scheduledAt, deadline, linkedPathItemId, order',
@@ -47,9 +44,6 @@ export interface RefqDatabase extends Dexie {
   paths: Table<LearningPath, string>;
   pathItems: Table<PathItem, string>;
   sessions: Table<Session, string>;
-  notes: Table<Note, string>;
-  noteIndexes: Table<NoteIndex, string>;
-  folders: Table<Folder, string>;
   reflections: Table<ReflectionEntry, string>;
   energyCheckins: Table<EnergyCheckin, string>;
   shariaTexts: Table<ShariaText, string>;
@@ -65,9 +59,6 @@ class RefqDatabaseImpl extends Dexie {
   paths!: Table<LearningPath, string>;
   pathItems!: Table<PathItem, string>;
   sessions!: Table<Session, string>;
-  notes!: Table<Note, string>;
-  noteIndexes!: Table<NoteIndex, string>;
-  folders!: Table<Folder, string>;
   reflections!: Table<ReflectionEntry, string>;
   energyCheckins!: Table<EnergyCheckin, string>;
   shariaTexts!: Table<ShariaText, string>;
@@ -82,6 +73,12 @@ class RefqDatabaseImpl extends Dexie {
     this.version(2).stores({
       prayerAnchors: 'id, date, prayer'
     });
+    // v3 — إزالة جداول الملاحظات نهائيًا (قرار: لا قسم للملاحظات في رِفق)
+    this.version(3).stores({
+      notes: null,
+      noteIndexes: null,
+      folders: null
+    });
   }
 }
 
@@ -94,9 +91,6 @@ export const dbSchema = {
     'paths',
     'pathItems',
     'sessions',
-    'notes',
-    'noteIndexes',
-    'folders',
     'reflections',
     'energyCheckins',
     'shariaTexts',

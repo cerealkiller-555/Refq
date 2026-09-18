@@ -25,7 +25,6 @@ describe('Backup System', () => {
     const snapshot = await exportAll();
     expect(snapshot.schemaVersion).toBeGreaterThanOrEqual(1);
     expect(snapshot.data.tasks).toHaveLength(1);
-    expect(snapshot.data.notes).toBeDefined();
   });
 
   it('importAll يستعيد البيانات في قاعدة فارغة تمامًا', async () => {

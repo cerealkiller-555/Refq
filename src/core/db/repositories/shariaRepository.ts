@@ -23,13 +23,12 @@ class ShariaRepository extends BaseRepository<ShariaText> {
     kind: ShariaTextKind,
     text: string,
     source: string,
-    opts?: { linkedNoteId?: string; pathId?: string }
+    opts?: { pathId?: string }
   ): Promise<ShariaText> {
     return this.create({
       kind,
       text,
       source,
-      linkedNoteId: opts?.linkedNoteId,
       pathId: opts?.pathId
     } as ShariaText);
   }

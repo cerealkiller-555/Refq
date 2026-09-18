@@ -1,14 +1,14 @@
 // ============================================================
 // رِفق — Screen: رحلتي (Learning)
-// المسارات، العناصر، الخطوة القادمة، الجلسات.
+// كارت "الخطوة القادمة" أول الصفحة، المسارات،
+// و"مسار جديد" مطفي آخر الصفحة (يُضاف نادرًا).
 // نبرة هادئة بلا ضغط — خطوة واحدة تكفي للبداية.
-// كل المنطق في الـstore والمحركات — هنا عرض فقط.
+// المنطق كله في الـstore والمحركات — هنا عرض فقط.
 // ============================================================
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLearningStore } from '../../../core/store/useLearningStore';
-import { useVaultStore } from '../../../core/store/useVaultStore';
-import { pathProgress } from '../../../core/engines/learningEngine';
+import { nextSteps, pathProgress } from '../../../core/engines/learningEngine';
 import { voice } from '../../../i18n/voice';
 import { Card, Button, Chip, EmptyState } from '../../components';
 import type { LearningPath, LearningPathType, PathItem, Session } from '../../../core/types';
@@ -80,6 +80,54 @@ function ItemForm({ pathId, nextOrder, onDone }: ItemFormProps) {
   );
 }
 
+/** الخطوة القادمة عبر كل المسارات النشطة — أول حاجة في الصفحة */
+function NextStepCard() {
+  const paths = useLearningStore((s) => s.paths);
+  const itemsByPath = useLearningStore((s) => s.itemsByPath);
+  const updateItem = useLearningStore((s) => s.updateItem);
+  const addSession = useLearningStore((s) => s.addSession);
+  const load = useLearningStore((s) => s.load);
+
+  const first = useMemo(() => nextSteps(paths, itemsByPath)[0], [paths, itemsByPath]);
+
+  if (!first) return null;
+
+  const startNow = async () => {
+    await updateItem(first.item.id, { status: 'in_progress' });
+  };
+
+  const logSession = async () => {
+    await addSession({
+      pathItemId: first.item.id,
+      date: new Date().toISOString(),
+      durationMinutes: first.item.estimatedDuration || 30
+    } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
+    await load();
+  };
+
+  return (
+    <Card title={L.nextStepTitle} icon="🚩" className="next-step-global">
+      <div className="next-step">
+        <div className="next-step-item">
+          <span className="task-title">{first.item.title}</span>
+          <Chip>🎓 {first.path.title}</Chip>
+          {first.item.estimatedDuration ? (
+            <Chip>
+              {first.item.estimatedDuration} {voice.today.suggestion.minutes}
+            </Chip>
+          ) : null}
+        </div>
+        <div className="banner-actions">
+          <Button onClick={() => void startNow()}>{L.startNow}</Button>
+          <Button variant="soft" onClick={() => void logSession()}>
+            ⏱ {L.addSession}
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function PathCard({ path }: { path: LearningPath }) {
   const items = useLearningStore((s) => s.itemsByPath[path.id] ?? []);
   const getItemsForPath = useLearningStore((s) => s.getItemsForPath);
@@ -90,12 +138,9 @@ function PathCard({ path }: { path: LearningPath }) {
   const load = useLearningStore((s) => s.load);
   const addSession = useLearningStore((s) => s.addSession);
   const sessions = useLearningStore((s) => s.sessions);
-  const linkNoteToItem = useLearningStore((s) => s.linkNoteToItem);
-  const vaultNotes = useVaultStore((s) => s.notes);
 
   const [showItemForm, setShowItemForm] = useState(false);
   const [sessionFor, setSessionFor] = useState<PathItem | null>(null);
-  const [linkingFor, setLinkingFor] = useState<PathItem | null>(null);
 
   useEffect(() => {
     void getItemsForPath(path.id);
@@ -117,14 +162,9 @@ function PathCard({ path }: { path: LearningPath }) {
     await load();
   };
 
-  const linkedNoteTitle = (itemId: string) => {
-    const noteId = items.find((i) => i.id === itemId)?.linkedNoteId;
-    return noteId ? vaultNotes.find((n) => n.id === noteId)?.title : undefined;
-  };
-
   return (
     <Card title={path.title} icon={L.types[path.type] ?? '🎓'}>
-      {/* الخطوة القادمة */}
+      {/* الخطوة القادمة في المسار */}
       {next ? (
         <div className="next-step">
           <p className="muted">{L.nextStepHint}</p>
@@ -160,35 +200,6 @@ function PathCard({ path }: { path: LearningPath }) {
         </div>
       )}
 
-      {/* ربط ملاحظة من المعرفة بهذا العنصر */}
-      {linkingFor && (
-        <div className="session-prompt">
-          <p>📎 اربطي ملاحظة من المعرفة بـ «{linkingFor.title}»:</p>
-          {vaultNotes.length === 0 ? (
-            <p className="muted">{voice.vault.noNotes}</p>
-          ) : (
-            <select
-              className="text-input"
-              aria-label={voice.vault.noteTitle}
-              defaultValue=""
-              onChange={(e) => {
-                const noteId = e.target.value || null;
-                if (noteId) void linkNoteToItem(linkingFor.id, noteId);
-                setLinkingFor(null);
-              }}
-            >
-              <option value="">— اختاري —</option>
-              {vaultNotes.map((n) => (
-                <option key={n.id} value={n.id}>
-                  {n.title}
-                </option>
-              ))}
-            </select>
-          )}
-          <Button variant="ghost" onClick={() => setLinkingFor(null)}>{voice.common.cancel}</Button>
-        </div>
-      )}
-
       {/* عناصر المسار */}
       <div className="learning-items">
         <p className="section-divider">{L.itemsTitle}</p>
@@ -213,20 +224,11 @@ function PathCard({ path }: { path: LearningPath }) {
                   {item.estimatedDuration ? `${item.estimatedDuration} ${voice.today.suggestion.minutes}` : ''}
                   {itemSessions(item.id) > 0 ? ` · ${itemSessions(item.id)} ${L.sessions}` : ''}
                 </span>
-                {item.linkedNoteId && linkedNoteTitle(item.id) && (
-                  <Chip>📎 {linkedNoteTitle(item.id)}</Chip>
-                )}
-                {item.status !== 'done' && (
-                  <button
-                    className="task-schedule"
-                    aria-label="📎 ربط ملاحظة"
-                    title="📎 ربط ملاحظة"
-                    onClick={() => setLinkingFor(item)}
-                  >
-                    📎
-                  </button>
-                )}
-                <button className="task-delete" aria-label={voice.common.delete} onClick={() => void deleteItem(item.id)}>
+                <button
+                  className="task-delete"
+                  aria-label={voice.common.delete}
+                  onClick={() => void deleteItem(item.id)}
+                >
                   ×
                 </button>
               </li>
@@ -260,11 +262,10 @@ export function LearningPage() {
 
   const [name, setName] = useState('');
   const [type, setType] = useState<LearningPathType>('university');
+  const [showAddPath, setShowAddPath] = useState(false);
 
   useEffect(() => {
     void load();
-    // ملاحظات المعرفة — لعرض أسمائها في ربط العناصر 📎
-    void useVaultStore.getState().load();
   }, [load]);
 
   const submit = async () => {
@@ -277,46 +278,15 @@ export function LearningPage() {
       order: paths.length + 1
     } as Omit<LearningPath, 'id' | 'createdAt' | 'updatedAt'>);
     setName('');
+    setShowAddPath(false);
   };
 
   return (
     <section className="screen">
       <h2 className="screen-title">{L.title}</h2>
 
-      {/* مسار جديد */}
-      <Card title={L.addPathTitle} icon="➕">
-        <div className="add-form">
-          <input
-            className="text-input"
-            placeholder={L.pathName}
-            aria-label={L.pathName}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void submit();
-            }}
-          />
-          <div className="form-row">
-            <div className="form-field">
-              <label>{L.pathType}</label>
-              <select
-                className="text-input"
-                value={type}
-                onChange={(e) => setType(e.target.value as LearningPathType)}
-              >
-                {PATH_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {L.types[t]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-field" style={{ alignSelf: 'flex-end' }}>
-              <Button onClick={() => void submit()}>{L.addPath}</Button>
-            </div>
-          </div>
-        </div>
-      </Card>
+      {/* الخطوة القادمة — أول حاجة في الصفحة */}
+      <NextStepCard />
 
       {/* المسارات */}
       {paths.length === 0 ? (
@@ -325,6 +295,53 @@ export function LearningPage() {
         </Card>
       ) : (
         paths.map((p) => <PathCard key={p.id} path={p} />)
+      )}
+
+      {/* مسار جديد — آخر الصفحة، يفتح عند الطلب */}
+      {showAddPath ? (
+        <Card title={L.addPathTitle} icon="➕">
+          <div className="add-form">
+            <input
+              className="text-input"
+              placeholder={L.pathName}
+              aria-label={L.pathName}
+              value={name}
+              autoFocus
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void submit();
+              }}
+            />
+            <div className="form-row">
+              <div className="form-field">
+                <label>{L.pathType}</label>
+                <select
+                  className="text-input"
+                  value={type}
+                  onChange={(e) => setType(e.target.value as LearningPathType)}
+                >
+                  {PATH_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {L.types[t]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-field" style={{ alignSelf: 'flex-end' }}>
+                <Button onClick={() => void submit()}>{L.addPath}</Button>
+              </div>
+            </div>
+            <div className="row">
+              <Button variant="ghost" size="sm" onClick={() => setShowAddPath(false)}>
+                {voice.common.cancel}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <div className="row" style={{ justifyContent: 'center' }}>
+          <Button variant="soft" onClick={() => setShowAddPath(true)}>＋ {L.addPathTitle}</Button>
+        </div>
       )}
     </section>
   );

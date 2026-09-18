@@ -10,8 +10,6 @@ import {
   reflectionRepository,
   pathItemRepository,
   learningPathRepository,
-  noteRepository,
-  folderRepository,
   prayerAnchorRepository,
   calendarRepository
 } from '../src/core/db/repositories';
@@ -32,9 +30,6 @@ describe('Refq Database', () => {
       'paths',
       'pathItems',
       'sessions',
-      'notes',
-      'noteIndexes',
-      'folders',
       'reflections',
       'energyCheckins',
       'shariaTexts',
@@ -105,23 +100,6 @@ describe('Refq Database', () => {
     expect(first.id).toBe(second.id);
   });
 
-  it('Vault Repo — إنشاء Note وربط Folder', async () => {
-    const folder = await folderRepository.create({
-      name: 'التفسير'
-    } as Parameters<typeof folderRepository.create>[0]);
-
-    const note = await noteRepository.createNote('فوائد سورة الكهف', '# فوائد\n\nنص', folder.id);
-    const fetched = await noteRepository.get(note.id);
-    expect(fetched?.rawMarkdown).toBe('# فوائد\n\nنص');
-
-    const byFolder = await noteRepository.getByFolder(folder.id);
-    expect(byFolder.map((n) => n.id)).toContain(note.id);
-
-    // تحديث markdown
-    await noteRepository.updateMarkdown(note.id, '# فوائد محدثة');
-    const after = await noteRepository.get(note.id);
-    expect(after?.rawMarkdown).toBe('# فوائد محدثة');
-  });
 
   it('Reflection Repo — إضافة تأمل بعد عنصر تعلّم', async () => {
     const reflection = await reflectionRepository.addEntry(

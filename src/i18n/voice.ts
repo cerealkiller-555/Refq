@@ -16,7 +16,10 @@ export const voice = {
       lightDay: 'أريد يومًا خفيفًا',
       notePlaceholder: 'ملاحظة (اختياري)…',
       saved: 'سجلنا طاقة اليوم 🤍 تعدليها في أي وقت.',
-      needLevelFirst: 'اختاري مستوى الطاقة أولًا، وبعدين فعّلي اليوم الخفيف.'
+      needLevelFirst: 'اختاري مستوى الطاقة أولًا، وبعدين فعّلي اليوم الخفيف.',
+      summary: 'طاقتك الآن: {level}',
+      edit: 'تعديل',
+      hide: 'إخفاء'
     },
     priorities: {
       title: 'أهم أولويات اليوم',
@@ -44,13 +47,17 @@ export const voice = {
       placeholder: 'خاطرة أو مهمة… اكتبيها واضغطي Enter'
     },
     tasks: {
-      title: 'مهامي الحالية',
-      empty: 'لا مهام مفتوحة الآن — يوم خفيف 🤍'
+      title: 'مهام اليوم',
+      empty: 'لا مهام لليوم ده — يوم خفيف 🤍',
+      seeAll: 'وفيه {count} مهمة تانية في التخطيط ←'
     }
   },
   planning: {
     tasksTitle: 'المهام',
     addTitle: 'مهمة جديدة',
+    quickAddPlaceholder: 'مهمة جديدة… اكتبيها واضغطي Enter',
+    showDetails: '＋ تفاصيل — أهمية، موعد، طاقة',
+    hideDetails: 'إخفاء التفاصيل',
     fields: {
       title: 'اسم المهمة',
       importance: 'الأهمية',
@@ -191,6 +198,7 @@ export const voice = {
     doneCount: 'مُنجز',
     sessions: 'جلسات',
     addSession: 'سجّلي جلسة',
+    startNow: 'ابدئي الآن',
     sessionOf: 'جلسة على',
     empty: 'ابدئي رحلتك بإضافة مسار تعليمي صغير — خطوة واحدة تكفي للبداية 🤍',
     emptyItems: 'لا عناصر بعد — أضيفي أول خطوة بهدوء.',
@@ -198,34 +206,6 @@ export const voice = {
     pause: 'إيقاف مؤقت',
     activate: 'متابعة',
     noActiveHint: 'أضيفي مسارًا نشطًا وستظهر خطواته هنا.'
-  },
-  vault: {
-    title: '🧠 المعرفة',
-    newNote: 'ملاحظة جديدة',
-    searchPlaceholder: 'ابحثي في الملاحظات والعناوين…',
-    allFolder: 'الكل',
-    unfiled: 'غير مصنّفة',
-    newFolder: 'مجلد جديد',
-    foldersTitle: 'المجلدات',
-    folderPlaceholder: 'اسم المجلد',
-    save: 'حفظ',
-    cancel: 'إلغاء',
-    edit: 'تعديل',
-    deleteConfirm: 'نحذف هذه الملاحظة؟ لا رجوع بعدها.',
-    noteTitle: 'عنوان الملاحظة',
-    noteBody: 'المحتوى (Markdown — [[روابط]] و#وسوم تعمل)',
-    backlinks: 'روابط عائدة',
-    noBacklinks: 'لا روابط عائدة بعد — اذكريها بـ[[العنوان]] في ملاحظة أخرى.',
-    openBacklink: 'افتحيها',
-    tagsLabel: 'وسوم',
-    linkedPathItem: 'مرتبطة بخطوة: {item}',
-    exportZip: '⬇ تصدير الكل (zip)',
-    exportNote: '⬇ .md',
-    rebuild: 'إعادة بناء الفهرس',
-    rebuilt: 'أُعيد بناء الفهرس من الـMarkdown — المصدر دائمًا هو النص نفسه 🤍',
-    noNotes: 'لا ملاحظات هنا — اكتبي أول فائدة أو خاطرة 🤍',
-    noResults: 'لا نتائج مطابقة — جرّبي كلمة أخرى.',
-    notesCount: '{count} ملاحظة'
   },
   common: {
     complete: 'إنجاز',

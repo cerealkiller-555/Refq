@@ -13,7 +13,7 @@ interface ShariaState {
     kind: ShariaTextKind,
     text: string,
     source: string,
-    opts?: { linkedNoteId?: string; pathId?: string }
+    opts?: { pathId?: string }
   ) => Promise<void>;
   deleteText: (id: string) => Promise<void>;
   getByKind: (kind: ShariaTextKind) => ShariaText[];

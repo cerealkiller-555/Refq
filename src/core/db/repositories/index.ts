@@ -7,7 +7,6 @@ export * from './baseRepository';
 export * from './taskRepository';
 export * from './calendarRepository';
 export * from './learningRepository';
-export * from './vaultRepository';
 export * from './heartRepository';
 export * from './systemRepository';
 export * from './shariaRepository';

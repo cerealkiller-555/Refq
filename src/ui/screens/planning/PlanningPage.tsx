@@ -1,7 +1,8 @@
 // ============================================================
 // رِفق — Screen: التخطيط (Planning)
-// P1: إدارة المهام كاملة (إضافة/تعديل/حذف/إنجاز/إعادة فتح).
-// التقويم نفسه يُبنى في P2 فوق هذا القسم.
+// إضافة مهمة سطر واحد + تفاصيل مخفية عند الطلب،
+// عدّاد على تاب المهام، و"أُنجزت" مطفية افتراضيًا.
+// التقويم (يوم/أسبوع) في CalendarView.
 // ============================================================
 
 import { useEffect, useState } from 'react';
@@ -46,6 +47,8 @@ export function PlanningPage() {
   const [scheduling, setScheduling] = useState<string | null>(null);
   const [schedDate, setSchedDate] = useState(todayKey());
   const [schedTime, setSchedTime] = useState('10:00');
+  const [showDetails, setShowDetails] = useState(false);
+  const [showDone, setShowDone] = useState(false);
 
   useEffect(() => {
     void load();
@@ -101,7 +104,7 @@ export function PlanningPage() {
         </div>
       )}
 
-      {/* التبويبات */}
+      {/* التبويبات — بعدّاد على المهام */}
       <div className="tabs" role="tablist">
         {(['tasks', 'day', 'week'] as const).map((t) => (
           <button
@@ -111,19 +114,19 @@ export function PlanningPage() {
             className={`tab${tab === t ? ' active' : ''}`}
             onClick={() => setTab(t)}
           >
-            {cal.tabs[t]}
+            {t === 'tasks' ? `${cal.tabs[t]} (${open.length})` : cal.tabs[t]}
           </button>
         ))}
       </div>
 
       {tab === 'tasks' ? (
         <>
-      {/* مهمة جديدة */}
+      {/* مهمة جديدة — سطر واحد، والتفاصيل مخفية عند الطلب */}
       <Card title={voice.planning.addTitle} icon="➕">
         <div className="add-form">
           <input
             className="text-input"
-            placeholder={voice.planning.fields.title}
+            placeholder={voice.planning.quickAddPlaceholder}
             aria-label={voice.planning.fields.title}
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
@@ -131,6 +134,15 @@ export function PlanningPage() {
               if (e.key === 'Enter') void submit();
             }}
           />
+          <button
+            className="details-toggle"
+            aria-expanded={showDetails}
+            onClick={() => setShowDetails(!showDetails)}
+          >
+            {showDetails ? `▾ ${voice.planning.hideDetails}` : `▸ ${voice.planning.showDetails}`}
+          </button>
+          {showDetails && (
+            <>
           <div className="form-row">
             <div className="form-field">
               <label>{voice.planning.fields.importance}</label>
@@ -181,7 +193,7 @@ export function PlanningPage() {
               <select
                 className="text-input"
                 value={form.energy}
-                                onChange={(e) => setForm({ ...form, energy: e.target.value as EnergyLevel | '' })}
+                onChange={(e) => setForm({ ...form, energy: e.target.value as EnergyLevel | '' })}
               >
                 <option value="">—</option>
                 <option value="low">{voice.planning.energyLabels.low}</option>
@@ -190,6 +202,8 @@ export function PlanningPage() {
               </select>
             </div>
           </div>
+            </>
+          )}
           <div>
             <Button onClick={() => void submit()} disabled={!form.title.trim()}>
               {voice.planning.fields.save}
@@ -306,35 +320,41 @@ export function PlanningPage() {
         )}
       </Card>
 
-      {/* أُنجزت */}
+      {/* أُنجزت — مطفية افتراضيًا، تفتح عند الطلب */}
       {done.length > 0 && (
         <>
-          <p className="section-divider">
-            {voice.planning.doneTitle} ({done.length})
-          </p>
-          <Card>
-            <ul className="task-list">
-              {done.map((task) => (
-                <li key={task.id} className="task-row done-row">
-                  <button
-                    className="task-check"
-                    aria-label={voice.common.reopen}
-                    onClick={() => void reopenTask(task.id)}
-                  >
-                    ↺
-                  </button>
-                  <span className="task-title">{task.title}</span>
-                  <button
-                    className="task-delete"
-                    aria-label={voice.common.delete}
-                    onClick={() => void deleteTask(task.id)}
-                  >
-                    ×
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </Card>
+          <button
+            className="done-toggle"
+            aria-expanded={showDone}
+            onClick={() => setShowDone(!showDone)}
+          >
+            {showDone ? '▾' : '▸'} {voice.planning.doneTitle} ({done.length})
+          </button>
+          {showDone && (
+            <Card>
+              <ul className="task-list">
+                {done.map((task) => (
+                  <li key={task.id} className="task-row done-row">
+                    <button
+                      className="task-check"
+                      aria-label={voice.common.reopen}
+                      onClick={() => void reopenTask(task.id)}
+                    >
+                      ↺
+                    </button>
+                    <span className="task-title">{task.title}</span>
+                    <button
+                      className="task-delete"
+                      aria-label={voice.common.delete}
+                      onClick={() => void deleteTask(task.id)}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
         </>
       )}
         </>

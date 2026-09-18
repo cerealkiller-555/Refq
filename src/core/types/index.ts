@@ -87,7 +87,6 @@ export interface PathItem extends Timestamps {
   estimatedDuration?: number; // minutes
   deadline?: string;
   status: PathItemStatus;
-  linkedNoteId?: ID;
   energyRequired?: 'low' | 'medium' | 'high';
 }
 
@@ -97,31 +96,6 @@ export interface Session extends Timestamps {
   date: string; // ISO
   durationMinutes: number;
   note?: string;
-}
-
-// ===== Vault =====
-
-// Markdown هو المصدر الوحيد للحقيقة (rawMarkdown)
-export interface Note extends Timestamps {
-  id: ID;
-  title: string;
-  rawMarkdown: string;
-  folderId?: ID;
-}
-
-// مشتقات — قابلة لإعادة البناء الكاملة من rawMarkdown
-export interface NoteIndex {
-  noteId: ID;
-  tags: string[];
-  properties: Record<string, string>;
-  outboundLinks: string[]; // أسماء/عناوين الملاحظات من [[...]]
-  updatedAt: string;
-}
-
-export interface Folder extends Timestamps {
-  id: ID;
-  name: string;
-  parentId?: ID;
 }
 
 // ===== Heart =====
@@ -187,7 +161,6 @@ export interface ShariaText extends Timestamps {
   kind: ShariaTextKind;
   text: string;
   source: string; // النص + المصدر إلزاميان — لا نصوص بلا مصدر
-  linkedNoteId?: ID;
   pathId?: ID;
 }
 
@@ -219,9 +192,6 @@ export interface BackupSnapshot {
     paths?: LearningPath[];
     pathItems?: PathItem[];
     sessions?: Session[];
-    notes?: Note[];
-    noteIndexes?: NoteIndex[];
-    folders?: Folder[];
     reflections?: ReflectionEntry[];
     energyCheckins?: EnergyCheckin[];
     shariaTexts?: ShariaText[];
