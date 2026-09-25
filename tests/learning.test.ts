@@ -19,6 +19,7 @@ import { nextSteps, pathProgress } from '../src/core/engines/learningEngine';
 import { pathItemToSuggestable, isLearningItem } from '../src/core/engines/suggestionEngine';
 import { useLearningStore } from '../src/core/store/useLearningStore';
 import { useTodayStore } from '../src/core/store/useTodayStore';
+import { useActiveTaskStore } from '../src/core/store/useActiveTaskStore';
 import { db } from '../src/core/db/schema';
 import type { LearningPath, PathItem, TaskRecord, PrayerAnchor } from '../src/core/types';
 
@@ -194,14 +195,15 @@ describe('الاندماج: خطوات التعلّم في "ماذا أفعل ا
     expect(suggestion?.reason).toContain('مادة المحاسبة');
   });
 
-  it('startSuggestedItem لخطوة تعليمية يحدّث المسار ولا يُنشئ مهمة', async () => {
+  it('startItem لخطوة تعليمية يحدّث المسار ولا يُنشئ مهمة', async () => {
     const path = await learningPathRepository.create(makePath());
     const item = await pathItemRepository.create(
       makeItem({ pathId: path.id, order: 0, title: 'حل واجب', estimatedDuration: 15 })
     );
     const tasksBefore = await taskRepository.getAll();
 
-    await useTodayStore.getState().startSuggestedItem(item.id, 'learning');
+    // البوابة الوحيدة للمهمة الجارية (useActiveTaskStore) — لا تُنشئ مهمة مكرّرة
+    await useActiveTaskStore.getState().startItem(item.id, 'learning', 'حل واجب', 15);
 
     const updated = await pathItemRepository.get(item.id);
     expect(updated?.status).toBe('in_progress');

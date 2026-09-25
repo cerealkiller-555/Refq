@@ -3,6 +3,7 @@
 // ============================================================
 
 export * from './useTodayStore';
+export * from './useActiveTaskStore';
 export * from './usePlanningStore';
 export * from './useLearningStore';
 export * from './useHeartStore';

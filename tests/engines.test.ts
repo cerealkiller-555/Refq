@@ -17,6 +17,10 @@ import {
   expandEvents,
   eventsForDay,
   eventsForWeek,
+  eventsForMonth,
+  groupTasksByDay,
+  monthGridKeys,
+  weekStartKey,
   weekDayKeys,
   addDaysKey,
   formatEventTime,
@@ -491,5 +495,72 @@ describe('CalendarEngine', () => {
     expect(d.getHours()).toBe(14);
     expect(d.getMinutes()).toBe(30);
     expect(iso.slice(0, 10)).toBe('2026-01-10');
+  });
+});
+
+describe('CalendarEngine — الشهر والمهام المجدولة', () => {
+  function ev(partial: Partial<CalendarEvent>): CalendarEvent {
+    return {
+      id: 'e1',
+      title: 'حدث',
+      kind: 'fixed',
+      start: '2026-02-01T09:00:00.000Z',
+      end: '2026-02-01T10:00:00.000Z',
+      createdAt: '',
+      updatedAt: '',
+      ...partial
+    };
+  }
+
+  it('weekStartKey يرجّع السبت الحاوي على اليوم (بداية الأسبوع = السبت)', () => {
+    const start = weekStartKey('2026-01-14'); // أربعاء
+    expect(start).toBe('2026-01-10'); // السبت
+    expect(new Date(`${start}T00:00:00`).getDay()).toBe(6);
+    expect(weekDayKeys(start)).toContain('2026-01-14');
+  });
+
+  it('شبكة الشهر 42 يومًا تبدأ السبت وتغطي أول الشهر وآخره', () => {
+    const keys = monthGridKeys('2026-02-15');
+    expect(keys).toHaveLength(42);
+    expect(new Date(`${keys[0]}T00:00:00`).getDay()).toBe(6);
+    expect(keys).toContain('2026-02-01');
+    expect(keys).toContain('2026-02-28');
+  });
+
+  it('eventsForMonth يضع الحدث في يومه المحلي ويشمل المتكرر', () => {
+    const daily = ev({
+      id: 'd',
+      recurring: { freq: 'daily' },
+      start: '2026-02-03T07:00:00.000Z',
+      end: '2026-02-03T08:00:00.000Z'
+    });
+    const oneOff = ev({
+      id: 'o',
+      start: localDateTimeISO('2026-02-10', '12:00'),
+      end: localDateTimeISO('2026-02-10', '13:00')
+    });
+
+    const byDay = eventsForMonth([daily, oneOff], '2026-02-15');
+    expect(byDay.size).toBe(42);
+    const day = byDay.get('2026-02-10') ?? [];
+    expect(day.some((o) => o.event.id === 'o')).toBe(true);
+    expect(day.some((o) => o.event.id === 'd')).toBe(true);
+    // يوم آخر بعيد يستقبل المتكرر وحده
+    expect((byDay.get('2026-02-20') ?? []).map((o) => o.event.id)).toEqual(['d']);
+  });
+
+  it('groupTasksByDay يجمع المجدولة بترتيب الوقت ويتجاهل المكتملة وغير المجدولة', () => {
+    const tasks: TaskRecord[] = [
+      makeTask({ id: 'a', scheduledAt: localDateTimeISO('2026-03-02', '14:00') }),
+      makeTask({ id: 'b', scheduledAt: localDateTimeISO('2026-03-02', '09:00') }),
+      makeTask({ id: 'c', status: 'done', scheduledAt: localDateTimeISO('2026-03-02', '10:00') }),
+      makeTask({ id: 'd' }),
+      makeTask({ id: 'e', scheduledAt: localDateTimeISO('2026-03-05', '08:00') })
+    ];
+
+    const byDay = groupTasksByDay(tasks);
+    expect([...byDay.keys()].sort()).toEqual(['2026-03-02', '2026-03-05']);
+    expect(byDay.get('2026-03-02')!.map((t) => t.id)).toEqual(['b', 'a']);
+    expect(byDay.get('2026-03-05')!.map((t) => t.id)).toEqual(['e']);
   });
 });

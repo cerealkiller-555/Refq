@@ -33,8 +33,6 @@ interface TodayState {
   loadToday: () => Promise<void>;
   checkIn: (level: EnergyLevel, note?: string, wantsLightDay?: boolean) => Promise<void>;
   askSuggestion: (availableMinutes: number) => Promise<void>;
-  /** بدء العنصر المقترح — مهمة عادية أو خطوة تعليمية في مسار */
-  startSuggestedItem: (id: string, kind?: 'task' | 'learning') => Promise<void>;
   addQuickTask: (title: string, minutes?: number) => Promise<void>;
   completeTask: (id: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
@@ -162,17 +160,6 @@ export const useTodayStore = create<TodayState>((set, get) => {
           : undefined
       });
       set({ tasks, suggestion });
-    },
-
-    startSuggestedItem: async (id, kind = 'task') => {
-      if (kind === 'learning') {
-        // خطوة تعليمية — تُحدَّث في مسارها، لا تُنشأ منها مهمة مكرّرة أبدًا
-        await pathItemRepository.update(id, { status: 'in_progress' });
-      } else {
-        await taskRepository.update(id, { status: 'in_progress' });
-      }
-      set({ suggestion: null });
-      await refresh();
     },
 
     addQuickTask: async (title, minutes = 15) => {

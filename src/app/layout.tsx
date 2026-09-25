@@ -1,21 +1,37 @@
 // ============================================================
 // رِفق — تخطيط التطبيق (Layout)
-// شريط تنقل سفلي للجوال/سطح المكتب مع مسار المحتوى.
+// هيدر هادئ (الاسم + ⚙️ النظام) + شريط تنقل سفلي لخمس وجهات،
+// وActiveTaskBar يحمّل حالة "المهمة الجارية" بنفسه (تحميل واحد فقط).
 // ============================================================
 
 import { Outlet, NavLink } from 'react-router-dom';
+import { ActiveTaskBar } from '../ui/components/ActiveTaskBar';
+import { voice } from '../i18n/voice';
 
 const NAV_ITEMS = [
   { to: '/', label: 'اليوم', icon: '🏠' },
   { to: '/planning', label: 'التخطيط', icon: '📅' },
+  { to: '/myplan', label: voice.myPlan.navLabel, icon: '📚' },
   { to: '/learning', label: 'رحلتي', icon: '🎓' },
-  { to: '/heart', label: 'القلب', icon: '🤍' },
-  { to: '/settings', label: 'النظام', icon: '⚙️' }
+  { to: '/heart', label: 'القلب', icon: '🤍' }
 ];
 
 export function AppLayout() {
   return (
     <div className="app-shell">
+      <header className="app-header">
+        <NavLink
+          to="/settings"
+          className={({ isActive }) => `header-settings${isActive ? ' active' : ''}`}
+          aria-label={voice.system.navLabel}
+          title={voice.system.navLabel}
+        >
+          ⚙️
+        </NavLink>
+        <h1>{voice.system.appName}</h1>
+        <p className="app-tagline">{voice.system.tagline}</p>
+      </header>
+      <ActiveTaskBar />
       <main className="app-main">
         <Outlet />
       </main>

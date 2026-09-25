@@ -1,22 +1,29 @@
 // ============================================================
 // رِفق — Screen: التخطيط (Planning)
-// إضافة مهمة سطر واحد + تفاصيل مخفية عند الطلب،
-// عدّاد على تاب المهام، و"أُنجزت" مطفية افتراضيًا.
-// التقويم (يوم/أسبوع) في CalendarView.
+// لمحة سريعة فوق، تبويبات واضحة (المهام/اليوم/الأسبوع/الشهر)،
+// إضافة مهمة سطر واحد + تفاصيل مخفية عند الطلب، و"أُنجزت" مطفية افتراضيًا.
+// التقويم (يوم/أسبوع/شهر) في CalendarView — والمهام المجدولة تظهر مع الأحداث.
 // ============================================================
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePlanningStore, todayKey } from '../../../core/store/usePlanningStore';
 import { rankTasks, describeReason } from '../../../core/engines/priorityEngine';
 import { findOverdueScheduledTasks } from '../../../core/engines/recoveryEngine';
+import {
+  eventsForWeek,
+  dateKey,
+  weekDayKeys,
+  weekStartKey
+} from '../../../core/engines/calendarEngine';
 import { voice } from '../../../i18n/voice';
 import { Card, Button, Chip, EmptyState } from '../../components';
 import { CalendarView } from './CalendarView';
 import type { TaskRecord, EnergyLevel } from '../../../core/types';
 
 const cal = voice.planning.calendar;
+const glance = voice.planning.glance;
 
-type Tab = 'tasks' | 'day' | 'week';
+type Tab = 'tasks' | 'day' | 'week' | 'month';
 
 const EMPTY_FORM = {
   title: '',
@@ -29,6 +36,7 @@ const EMPTY_FORM = {
 
 export function PlanningPage() {
   const tasks = usePlanningStore((s) => s.tasks);
+  const events = usePlanningStore((s) => s.events);
   const load = usePlanningStore((s) => s.load);
   const addTask = usePlanningStore((s) => s.addTask);
   const updateTask = usePlanningStore((s) => s.updateTask);
@@ -49,6 +57,8 @@ export function PlanningPage() {
   const [schedTime, setSchedTime] = useState('10:00');
   const [showDetails, setShowDetails] = useState(false);
   const [showDone, setShowDone] = useState(false);
+  /** اليوم المرجعي للتقويم — يتغير عند التنقل أو الضغط على يوم في الأسبوع/الشهر */
+  const [anchor, setAnchor] = useState(todayKey());
 
   useEffect(() => {
     void load();
@@ -57,6 +67,22 @@ export function PlanningPage() {
   const open = rankTasks(tasks).map((entry) => entry.task);
   const done = tasks.filter((t) => t.status === 'done');
   const overdue = findOverdueScheduledTasks(tasks, todayKey());
+
+  // ===== لمحة سريعة: أرقام تعطي اتجاهًا فوريًا بلا توهان =====
+  const weekStart = useMemo(() => weekStartKey(todayKey()), []);
+  const weekDaySet = useMemo(() => new Set(weekDayKeys(weekStart)), [weekStart]);
+  const weekTasks = useMemo(
+    () => tasks.filter(
+      (t) => t.scheduledAt && t.status !== 'done' && weekDaySet.has(dateKey(new Date(t.scheduledAt)))
+    ).length,
+    [tasks, weekDaySet]
+  );
+  const weekEvents = useMemo(() => {
+    const byDay = eventsForWeek(events, weekStart);
+    const seen = new Set<string>();
+    for (const list of byDay.values()) for (const occ of list) seen.add(`${occ.event.id}-${occ.start}`);
+    return seen.size;
+  }, [events, weekStart]);
 
   const submit = async () => {
     const title = form.title.trim();
@@ -83,6 +109,17 @@ export function PlanningPage() {
     <section className="screen">
       <h2 className="screen-title">📅 {voice.planning.tasksTitle}</h2>
 
+      {/* لمحة سريعة — أرقام اتجاه واحد بلا توهان */}
+      <div className="planning-glance">
+        <span className="glance-chip">📋 {glance.open.replace('{n}', String(open.length))}</span>
+        <span className="glance-chip">
+          {`🗓️ ${glance.weekTasks.replace('{n}', String(weekTasks))} · ${glance.weekEvents.replace('{n}', String(weekEvents))}`}
+        </span>
+        {overdue.length > 0 && (
+          <span className="glance-chip warn">{`⏳ ${glance.overdue.replace('{n}', String(overdue.length))}`}</span>
+        )}
+      </div>
+
       {/* لافتة يوم فائت — تظهر فقط للمهام المتأخرة، وبلا أي إجراء تلقائي */}
       {overdue.length > 0 && !replanResult && (
         <div className="recovery-banner" role="status">
@@ -97,7 +134,12 @@ export function PlanningPage() {
           <p>{cal.recovery.applied}</p>
           <p className="muted">
             {replanResult.moved.length > 0
-              ? replanResult.moved.map((m) => `${m.taskId.slice(0, 4)}… ← ${m.scheduledAt.slice(0, 10)}`).join(' · ')
+              ? replanResult.moved
+                  .map((m) => {
+                    const title = tasks.find((t) => t.id === m.taskId)?.title ?? voice.planning.tasksTitle;
+                    return `${title} ← ${m.scheduledAt.slice(0, 10)}`;
+                  })
+                  .join(' · ')
               : '—'}
           </p>
           <Button variant="ghost" onClick={clearReplanResult}>{cal.recovery.dismiss}</Button>
@@ -106,7 +148,7 @@ export function PlanningPage() {
 
       {/* التبويبات — بعدّاد على المهام */}
       <div className="tabs" role="tablist">
-        {(['tasks', 'day', 'week'] as const).map((t) => (
+        {(['tasks', 'day', 'week', 'month'] as const).map((t) => (
           <button
             key={t}
             role="tab"
@@ -359,7 +401,14 @@ export function PlanningPage() {
       )}
         </>
       ) : (
-        <CalendarView initialView={tab === 'day' ? 'day' : 'week'} />
+        <CalendarView
+          view={tab}
+          anchorKey={anchor}
+          onOpenDay={(key) => {
+            setAnchor(key);
+            setTab('day');
+          }}
+        />
       )}
     </section>
   );

@@ -58,6 +58,12 @@ export const voice = {
     quickAddPlaceholder: 'مهمة جديدة… اكتبيها واضغطي Enter',
     showDetails: '＋ تفاصيل — أهمية، موعد، طاقة',
     hideDetails: 'إخفاء التفاصيل',
+    glance: {
+      open: '{n} مهمة مفتوحة',
+      weekTasks: '{n} مهمة هذا الأسبوع',
+      weekEvents: '{n} حدث هذا الأسبوع',
+      overdue: '{n} متأخرة — نرتّبها بلطف'
+    },
     fields: {
       title: 'اسم المهمة',
       importance: 'الأهمية',
@@ -73,7 +79,7 @@ export const voice = {
     empty: 'لا مهام بعد — أضيفي أول مهمة بهدوء.',
     doneTitle: 'أُنجزت',
     calendar: {
-      tabs: { tasks: '📋 المهام', day: '📅 اليوم', week: '🗓️ الأسبوع' },
+      tabs: { tasks: '📋 المهام', day: '📅 اليوم', week: '🗓️ الأسبوع', month: '🗓️ الشهر' },
       addEventTitle: 'حدث جديد',
       eventName: 'اسم الحدث',
       kind: 'النوع',
@@ -87,6 +93,16 @@ export const voice = {
       kindLabels: { fixed: 'ثابت', flexible: 'مرن' } as Record<string, string>,
       emptyDay: 'لا أحداث في هذا اليوم — يوم مفتوح لك 🤍',
       emptyWeek: 'أسبوعك فاضي — أضيفي أول حدث بهدوء.',
+      emptyMonth: 'الشهر لسه فاضي — ابدئي بحدث واحد بهدوء.',
+      tasksWord: 'مهام',
+      eventsWord: 'أحداث',
+      openDayHint: 'اضغطي أي يوم لعرض تفاصيله.',
+      monthNames: [
+        'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+        'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+      ] as string[],
+      daysShort: ['سبت', 'أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة'] as string[],
+
       prev: 'السابق',
       next: 'التالي',
       today: 'اليوم',
@@ -172,6 +188,10 @@ export const voice = {
       empty: 'لا نصوص بعد — أضيفي آية أو حديث أو فائدة 🤍',
       linkedPath: 'مرتبط بمسار: {path}'
     },
+    tabIcons: { athar: '🌱', search_heart: '💭', waqfa: '🧭', muhasaba: '🤍', sharia: '📖' } as Record<string, string>,
+    historyFilterAll: 'الكل',
+    showMore: 'شوفي كمان',
+
     history: 'السجل',
     noHistory: 'لا سجل بعد — سجّلي أول تأمل 🤍',
     todayDone: 'سجّلي اليوم — تقدري تعودي غدًا 🤍'
@@ -207,6 +227,41 @@ export const voice = {
     activate: 'متابعة',
     noActiveHint: 'أضيفي مسارًا نشطًا وستظهر خطواته هنا.'
   },
+  myPlan: {
+    navLabel: 'خطتي',
+    title: '📚 خطتي الدراسية',
+    subtitle: 'موادكِ الدراسية بخطوات واضحة وجلسات هادئة — ركزي على خطوة واحدة تكفي للتقدم.',
+    empty: 'لا توجد مواد دراسية مضافة بعد — أضيفي مادتك أو مساركِ الأول من شاشة «رحلتي» لتنظيم خطواتها هنا 🤍',
+    progress: 'أُنجز {done} من {total} ({percent}%)',
+    whereIStopped: 'آخر توقف:',
+    noPreviousSession: 'بداية الرحلة — لم تسجلي جلسات بعد',
+    nextAction: 'خطوتك التالية:',
+    startSession: 'ابدئي جلسة',
+    continueSession: 'مستمرة الآن',
+    inProgressIndicator: 'شغّالة عليها الآن ⏳',
+    allDone: 'أتممتِ كل خطوات هذه المادة بارك الله فيكِ 🌸',
+    sessionsTotal: '{count} جلسات مسجلة',
+    durationChip: '{minutes} د',
+    expandItems: 'عرض كل الخطوات',
+    collapseItems: 'طي الخطوات',
+    activeTag: 'نشط',
+    pausedTag: 'موقوف مؤقتًا',
+    completedTag: 'مكتمل'
+  },
+
+  activeTask: {
+    hide: 'إخفاء — المهمة مستمرة',
+    restore: 'المهمة الجارية',
+    replaceQuestion: 'إنتِ شغّالة على «{current}» — تبدئي «{next}»؟',
+    replace: 'استبدال',
+    back: 'رجوع',
+    paused: 'موقوفة مؤقتًا',
+    pause: 'إيقاف مؤقت',
+    resume: 'استئناف',
+    timeUp: 'خلص الوقت 🤍',
+    logSession: '⏱ سجّلي جلسة',
+    keepGoing: 'كملّي بلا وقت'
+  },
   common: {
     complete: 'إنجاز',
     reopen: 'إعادة فتح',
@@ -214,6 +269,48 @@ export const voice = {
     edit: 'تعديل',
     save: 'حفظ',
     cancel: 'إلغاء'
+  },
+  system: {
+    title: '⚙️ النظام',
+    navLabel: 'الإعدادات',
+    appName: 'رِفق',
+    tagline: 'رفق بنفسك — خطوة واحدة في الوقت',
+    backupHint: 'بياناتك كلها محفوظة في متصفحك — وتقدري تخرجيها في ملف في أي وقت 🤍',
+    exportTitle: 'نسخة احتياطية',
+    exportHint: 'ملف JSON واحد فيه كل حاجة — مهام، مسارات، تأملات.',
+    exportButton: '📥 نزّلي نسخة احتياطية',
+    exportDone: 'تم تنزيل الملف 🤍 خزّنيه في مكان آمن.',
+    importTitle: 'استيراد نسخة',
+    importHint: 'اختاري ملف نسخة احتياطية سبق تنزيله.',
+    importButton: '📤 استيراد نسخة',
+    importConfirmQuestion: 'الاستيراد هيمسح كل البيانات الحالية ويحل مكانها محتوى الملف. نكمّل؟',
+    importConfirm: 'أيوه، استوردي',
+    importCancel: 'رجوع',
+    importDone: 'تم الاستيراد 🤍 ({tables} جدول)',
+    importInvalid: 'الملف ده مقروءش كنسخة احتياطية صحيحة.',
+    importUnsupported: 'نسخة الملف ({version}) غير مدعومة — حدّثي التطبيق الأول.',
+    dangerTitle: 'حذف كل البيانات',
+    dangerHint: 'مسح نهائي لكل حاجة — بلا رجعة. خزّني نسخة احتياطية الأول لو محتاجة.',
+    dangerButton: '🗑 امسحي كل حاجة',
+    dangerConfirmQuestion: 'متأكدة؟ ده هيمسح كل مهامك ومساراتك وتأملاتك نهائيًا.',
+    dangerConfirm: 'أيوه، امسحي',
+    dangerCancel: 'لا، خلاص',
+    dangerDone: 'اتمسحت كل البيانات. صفحة بيضاء جديدة 🤍',
+    infoTitle: 'معلومات',
+    schemaVersion: 'إصدار قاعدة البيانات: {version}',
+    errorGeneric: 'حصلت مشكلة بسيطة — جرّبي تاني.',
+    counts: {
+      tasks: 'مهام',
+      calendarEvents: 'أحداث',
+      paths: 'مسارات',
+      pathItems: 'خطوات',
+      sessions: 'جلسات',
+      reflections: 'تأملات',
+      energyCheckins: 'قياسات طاقة',
+      shariaTexts: 'نصوص شرعية',
+      prayerAnchors: 'مراسي صلاة',
+      settings: 'إعدادات'
+    } as Record<string, string>
   }
 };
 

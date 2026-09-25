@@ -260,28 +260,73 @@ function ShariaSection() {
   );
 }
 
-/** السجل — التأملات بهدوء، بلا أرقام ولا لوم */
+/** السجل — فلترة بالنوع + عرض تدريجي بلا قص صامت */
 function HistorySection({ reflections }: { reflections: ReflectionEntry[] }) {
-  const sorted = [...reflections].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  const [filter, setFilter] = useState<'all' | ReflectionEntry['kind']>('all');
+  const [visible, setVisible] = useState(20);
+
+  const sorted = useMemo(
+    () => [...reflections].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')),
+    [reflections]
+  );
+  const filtered = useMemo(
+    () => (filter === 'all' ? sorted : sorted.filter((r) => r.kind === filter)),
+    [sorted, filter]
+  );
+  const shown = filtered.slice(0, visible);
+  const more = filtered.length - shown.length;
+
   if (sorted.length === 0) {
     return <p className="muted">{H.noHistory}</p>;
   }
+
+  const filters: ('all' | ReflectionEntry['kind'])[] = ['all', 'athar', 'search_heart', 'waqfa', 'muhasaba'];
+
   return (
-    <div className="history-list">
-      {sorted.slice(0, 20).map((r) => (
-        <div key={r.id} className="history-row">
-          <div className="reason-chips">
-            <Chip>{H.tabs[r.kind] ?? r.kind}</Chip>
-            <span className="muted">{r.date}</span>
+    <>
+      <div className="history-filters">
+        {filters.map((f) => (
+          <button
+            key={f}
+            className={`chip${filter === f ? ' chip-selected' : ''}`}
+            aria-pressed={filter === f}
+            onClick={() => {
+              setFilter(f);
+              setVisible(20);
+            }}
+          >
+            {f === 'all' ? H.historyFilterAll : `${H.tabIcons[f]} ${H.tabs[f]}`}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="muted">{H.noHistory}</p>
+      ) : (
+        <>
+          <div className="history-list">
+            {shown.map((r) => (
+              <div key={r.id} className="history-row">
+                <div className="reason-chips">
+                  <Chip>{H.tabs[r.kind] ?? r.kind}</Chip>
+                  <span className="muted">{r.date}</span>
+                </div>
+                {r.skipped ? (
+                  <p className="muted">{H.todayDone}</p>
+                ) : (
+                  <p>{Object.values(r.answers).filter(Boolean).join(' · ')}</p>
+                )}
+              </div>
+            ))}
           </div>
-          {r.skipped ? (
-            <p className="muted">{H.todayDone}</p>
-          ) : (
-            <p>{Object.values(r.answers).filter(Boolean).join(" · ")}</p>
+          {more > 0 && (
+            <button className="show-more" onClick={() => setVisible(visible + 20)}>
+              {H.showMore} ({more})
+            </button>
           )}
-        </div>
-      ))}
-    </div>
+        </>
+      )}
+    </>
   );
 }
 
@@ -318,21 +363,27 @@ export function HeartPage() {
     };
   }, [tab, getTodayByKind, reflections]);
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: "athar", label: H.tabs.athar },
-    { key: "search_heart", label: H.tabs.search_heart },
-    { key: "waqfa", label: H.tabs.waqfa },
-    { key: "muhasaba", label: H.tabs.muhasaba },
-    { key: "sharia", label: H.tabs.sharia }
+  const tabs: { key: Tab; label: string; icon: string }[] = [
+    { key: "athar", label: H.tabs.athar, icon: H.tabIcons.athar },
+    { key: "search_heart", label: H.tabs.search_heart, icon: H.tabIcons.search_heart },
+    { key: "waqfa", label: H.tabs.waqfa, icon: H.tabIcons.waqfa },
+    { key: "muhasaba", label: H.tabs.muhasaba, icon: H.tabIcons.muhasaba },
+    { key: "sharia", label: H.tabs.sharia, icon: H.tabIcons.sharia }
   ];
 
   return (
     <section className="screen">
       <h2 className="screen-title">{H.title}</h2>
 
-      <div className="tabs">
+      <div className="tabs tabs-scroll">
         {tabs.map((t) => (
-          <button key={t.key} className={`tab${tab === t.key ? " active" : ""}`} onClick={() => setTab(t.key)}>
+          <button
+            key={t.key}
+            className={`tab${tab === t.key ? " active" : ""}`}
+            aria-selected={tab === t.key}
+            onClick={() => setTab(t.key)}
+          >
+            <span className="tab-icon" aria-hidden="true">{t.icon}</span>
             {t.label}
           </button>
         ))}

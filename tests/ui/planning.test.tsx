@@ -154,4 +154,49 @@ describe('Planning Calendar UI', () => {
     const row = within(list).getByText('درس ثابت مهم').closest('li');
     expect(row?.className).toContain('ev-fixed');
   });
+  it('عرض الشهر: شبكة 42 يومًا مع عدّاد المهام المجدولة، والضغط على يوم يفتحه', async () => {
+    const user = userEvent.setup();
+    await makeTask({ title: 'مهمة الشهر', scheduledAt: localDateTimeISO(todayKey(), '11:00') });
+    await usePlanningStore.getState().load();
+
+    render(<PlanningPage />);
+    await user.click(await screen.findByRole('tab', { name: cal.tabs.month }));
+
+    await waitFor(() => {
+      expect(document.querySelector('.month-grid')).not.toBeNull();
+    });
+    expect(document.querySelectorAll('.month-cell')).toHaveLength(42);
+    // يوم اليوم يحمل عدّاد مهمة واحدة
+    expect(document.querySelector('.mb-task')?.textContent).toContain('📋');
+
+    // الضغط على اليوم الحالي يفتح عرض اليوم بتفاصيله
+    await user.click(document.querySelector('.month-cell.today') as HTMLElement);
+    await waitFor(() => {
+      expect(screen.getByText('مهمة الشهر')).toBeDefined();
+    });
+  });
+
+  it('عرض الأسبوع يعرض المهام المجدولة مع الأحداث بلا توهان', async () => {
+    const user = userEvent.setup();
+    await makeTask({ title: 'مهمة الأسبوع', scheduledAt: localDateTimeISO(todayKey(), '15:00') });
+    await usePlanningStore.getState().addOccurrence({
+      title: 'حدث الأسبوع',
+      kind: 'fixed',
+      dateKey: todayKey(),
+      time: '08:00',
+      durationMinutes: 60
+    });
+    await usePlanningStore.getState().load();
+
+    render(<PlanningPage />);
+    await user.click(await screen.findByRole('tab', { name: cal.tabs.week }));
+
+    await waitFor(() => {
+      expect(document.querySelector('.week-grid')).not.toBeNull();
+    });
+    expect(document.querySelectorAll('.week-col')).toHaveLength(7);
+    expect(document.querySelectorAll('.task-chip').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('مهمة الأسبوع').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('حدث الأسبوع').length).toBeGreaterThanOrEqual(1);
+  });
 });

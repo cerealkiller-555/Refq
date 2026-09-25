@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTodayStore } from '../../../core/store/useTodayStore';
+import { useActiveTaskStore } from '../../../core/store/useActiveTaskStore';
 import { describeReason } from '../../../core/engines/priorityEngine';
 import { PRAYER_LABELS } from '../../../core/engines/dayPeriods';
 import { isLearningItem } from '../../../core/engines/suggestionEngine';
@@ -68,10 +69,10 @@ export function TodayPage() {
   const completeTask = useTodayStore((s) => s.completeTask);
   const deleteTask = useTodayStore((s) => s.deleteTask);
   const updateTask = useTodayStore((s) => s.updateTask);
-  const startSuggestedItem = useTodayStore((s) => s.startSuggestedItem);
   const clearSuggestion = useTodayStore((s) => s.clearSuggestion);
   const anchors = useTodayStore((s) => s.anchors);
   const currentPeriod = useTodayStore((s) => s.currentPeriod);
+  const startItem = useActiveTaskStore((s) => s.startItem);
 
   const [quick, setQuick] = useState('');
   const [energyNote, setEnergyNote] = useState('');
@@ -104,8 +105,9 @@ export function TodayPage() {
   const startSuggested = () => {
     if (!suggestion?.task) return;
     const item = suggestion.task;
-    // خطوة تعليمية تُبدأ في مسارها — لا تُنشأ منها مهمة مكرّرة
-    void startSuggestedItem(item.id, isLearningItem(item) ? 'learning' : 'task');
+    // البوابة الوحيدة: قاعدة المهمة الجارية الواحدة (نافذة استبدال عند الحاجة)
+    const minutes = isLearningItem(item) ? item.estimatedDuration ?? 30 : item.estimatedDuration || 15;
+    void startItem(item.id, isLearningItem(item) ? 'learning' : 'task', item.title, minutes);
     clearSuggestion();
   };
 
@@ -295,6 +297,16 @@ export function TodayPage() {
                   </div>
                 </div>
                 <div className="priority-actions">
+                  {task.status !== 'in_progress' && (
+                    <button
+                      className="task-start"
+                      aria-label={voice.today.suggestion.start}
+                      title={voice.today.suggestion.start}
+                      onClick={() => void startItem(task.id, 'task', task.title, task.estimatedDuration || 15)}
+                    >
+                      ▶
+                    </button>
+                  )}
                   <button
                     className="task-check"
                     aria-label={voice.common.complete}

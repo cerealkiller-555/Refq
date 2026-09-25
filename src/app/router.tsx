@@ -6,6 +6,7 @@ import { createHashRouter } from 'react-router-dom';
 import { AppLayout } from './layout';
 import { TodayPage } from '../ui/screens/today/TodayPage';
 import { PlanningPage } from '../ui/screens/planning/PlanningPage';
+import { MyPlanPage } from '../ui/screens/myplan/MyPlanPage';
 import { LearningPage } from '../ui/screens/learning/LearningPage';
 import { HeartPage } from '../ui/screens/heart/HeartPage';
 import { SettingsPage } from '../ui/screens/system/SettingsPage';
@@ -17,6 +18,7 @@ export const router = createHashRouter([
     children: [
       { index: true, element: <TodayPage /> },
       { path: 'planning', element: <PlanningPage /> },
+      { path: 'myplan', element: <MyPlanPage /> },
       { path: 'learning', element: <LearningPage /> },
       { path: 'heart', element: <HeartPage /> },
       { path: 'settings', element: <SettingsPage /> }

@@ -8,6 +8,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useLearningStore } from '../../../core/store/useLearningStore';
+import { useActiveTaskStore } from '../../../core/store/useActiveTaskStore';
 import { nextSteps, pathProgress } from '../../../core/engines/learningEngine';
 import { voice } from '../../../i18n/voice';
 import { Card, Button, Chip, EmptyState } from '../../components';
@@ -84,16 +85,17 @@ function ItemForm({ pathId, nextOrder, onDone }: ItemFormProps) {
 function NextStepCard() {
   const paths = useLearningStore((s) => s.paths);
   const itemsByPath = useLearningStore((s) => s.itemsByPath);
-  const updateItem = useLearningStore((s) => s.updateItem);
   const addSession = useLearningStore((s) => s.addSession);
   const load = useLearningStore((s) => s.load);
+  const startItem = useActiveTaskStore((s) => s.startItem);
 
   const first = useMemo(() => nextSteps(paths, itemsByPath)[0], [paths, itemsByPath]);
 
   if (!first) return null;
 
   const startNow = async () => {
-    await updateItem(first.item.id, { status: 'in_progress' });
+    // البوابة الوحيدة — قاعدة المهمة الجارية الواحدة + مؤقت بمدة الخطوة
+    await startItem(first.item.id, 'learning', first.item.title, first.item.estimatedDuration || 30);
   };
 
   const logSession = async () => {

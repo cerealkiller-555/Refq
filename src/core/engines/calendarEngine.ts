@@ -4,7 +4,7 @@
 // بلا UI، بلا Dexie، بلا side effects — قابل للاختبار تمامًا
 // ============================================================
 
-import type { CalendarEvent } from '../types';
+import type { CalendarEvent, TaskRecord } from '../types';
 
 /** حدوث فعلي لحدث (للأحداث المتكررة يختلف عن event.start الأصلي) */
 export interface EventOccurrence {
@@ -115,19 +115,10 @@ export function weekDayKeys(weekStartKey: string): string[] {
   return Array.from({ length: 7 }, (_, i) => addDaysKey(weekStartKey, i));
 }
 
-/** تجميع أحداث أسبوع (7 أيام تبدأ من weekStartKey) — مفتاح اليوم ← حدوثاته */
-export function eventsForWeek(
-  events: CalendarEvent[],
-  weekStartKey: string
-): Map<string, EventOccurrence[]> {
-  const days = weekDayKeys(weekStartKey);
-  const from = new Date(`${days[0]}T00:00:00`).toISOString();
-  const to = new Date(`${addDaysKey(days[6], 1)}T00:00:00`).toISOString();
-  const occurrences = expandEvents(events, from, to);
-
-  const byDay = new Map<string, EventOccurrence[]>(days.map((d) => [d, []]));
+/** تجميع حدوثات في دلاء أيام — الحدث يُسند لكل يوم محلي يتقاطع معه */
+function bucketByDay(occurrences: EventOccurrence[], keys: string[]): Map<string, EventOccurrence[]> {
+  const byDay = new Map<string, EventOccurrence[]>(keys.map((d) => [d, []]));
   for (const occ of occurrences) {
-    // الحدث يُدرج في كل يوم محلي يتقاطع معه
     let cursor = new Date(occ.start);
     const endMs = new Date(occ.end).getTime();
     let guard = 0;
@@ -139,6 +130,72 @@ export function eventsForWeek(
     }
   }
   return byDay;
+}
+
+/** تجميع أحداث أسبوع (7 أيام تبدأ من weekStartKey) — مفتاح اليوم ← حدوثاته */
+export function eventsForWeek(
+  events: CalendarEvent[],
+  weekStartKey: string
+): Map<string, EventOccurrence[]> {
+  const days = weekDayKeys(weekStartKey);
+  const from = new Date(`${days[0]}T00:00:00`).toISOString();
+  const to = new Date(`${addDaysKey(days[6], 1)}T00:00:00`).toISOString();
+  return bucketByDay(expandEvents(events, from, to), days);
+}
+
+/** أول يوم (السبت) في شبكة الشهر الحاوي على anchorKey */
+export function monthGridStartKey(anchorKey: string): string {
+  const d = new Date(`${anchorKey}T00:00:00`);
+  const first = new Date(d.getFullYear(), d.getMonth(), 1);
+  const back = (first.getDay() + 1) % 7; // السبت = بداية أسبوعنا
+  return addDaysKey(dateKey(first), -back);
+}
+
+/** مفاتيح شبكة الشهر — 6 أسابيع × 7 أيام (42 مفتاحًا) تبدأ من السبت */
+export function monthGridKeys(anchorKey: string): string[] {
+  const start = monthGridStartKey(anchorKey);
+  return Array.from({ length: 42 }, (_, i) => addDaysKey(start, i));
+}
+
+/** رقم الشهر الميلادي (0-11) لمفتاح تاريخ */
+export function monthOfKey(anchorKey: string): number {
+  return new Date(`${anchorKey}T00:00:00`).getMonth();
+}
+
+/** أحداث الشهر موزعة على أيام شبكته (42 يومًا) */
+export function eventsForMonth(
+  events: CalendarEvent[],
+  anchorKey: string
+): Map<string, EventOccurrence[]> {
+  const keys = monthGridKeys(anchorKey);
+  const from = new Date(`${keys[0]}T00:00:00`).toISOString();
+  const to = new Date(`${addDaysKey(keys[41], 1)}T00:00:00`).toISOString();
+  return bucketByDay(expandEvents(events, from, to), keys);
+}
+
+/**
+ * المهام المجدولة موزعة على يومها المحلي.
+ * المكتملة وغير المجدولة لا تظهر — والترتيب داخل اليوم بوقت الجدولة.
+ */
+export function groupTasksByDay(tasks: TaskRecord[]): Map<string, TaskRecord[]> {
+  const byDay = new Map<string, TaskRecord[]>();
+  for (const task of tasks) {
+    if (!task.scheduledAt || task.status === 'done') continue;
+    const key = dateKey(new Date(task.scheduledAt));
+    const list = byDay.get(key);
+    if (list) list.push(task);
+    else byDay.set(key, [task]);
+  }
+  for (const list of byDay.values()) {
+    list.sort((a, b) => (a.scheduledAt ?? '').localeCompare(b.scheduledAt ?? ''));
+  }
+  return byDay;
+}
+
+/** بداية الأسبوع (السبت) الحاوي على مفتاح يوم */
+export function weekStartKey(dayKey: string): string {
+  const d = new Date(`${dayKey}T00:00:00`);
+  return addDaysKey(dayKey, -((d.getDay() + 1) % 7));
 }
 
 /** تنسيق وقت الحدث للعرض — "09:00–10:30" (بلا تواريخ مطلقة) */
