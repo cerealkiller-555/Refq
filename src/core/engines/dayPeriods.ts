@@ -9,8 +9,6 @@
 
 import type { DayPeriod, PrayerAnchor, PrayerKey } from '../types';
 
-export const PRAYER_ORDER: PrayerKey[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
-
 export const PRAYER_LABELS: Record<PrayerKey, string> = {
   fajr: 'الفجر',
   dhuhr: 'الظهر',

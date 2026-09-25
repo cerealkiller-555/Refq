@@ -9,14 +9,14 @@ import { computePriorityScore, describeTaskFactors, energyFitScore } from './pri
 import type { TaskRecord, EnergyLevel, PathItem } from '../types';
 
 /** فترة اليوم الحالية (من مراسي الصلوات) — اختيارية تمامًا */
-export interface SuggestionPeriod {
+interface SuggestionPeriod {
   /** المتبقي في الفترة؛ null = مفتوحة بلا سقف (ليل بعد العشاء) */
   remainingMinutes: number | null;
   /** اسم المرساة القادمة (مثل "المغرب") للاستخدام في السبب */
   nextAnchorLabel?: string;
 }
 
-export interface SuggestionContext {
+interface SuggestionContext {
   availableMinutes: number;
   energy?: EnergyLevel;
   wantsLightDay?: boolean;

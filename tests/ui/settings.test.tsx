@@ -93,7 +93,11 @@ describe('System UI — ملكية البيانات', () => {
       expect(await taskRepository.getAll()).toHaveLength(1);
     });
     expect((await taskRepository.getAll())[0].title).toBe('مهمة النسخة');
-    expect(await screen.findByText(S.importDone.replace('{tables}', '10'))).toBeDefined();
+    // الاستيراد يمسح/يكتب 10 جداول IndexedDB ثم يعرض النتيجة — نمنحه مهلة كافية
+    // (المحاولة الافتراضية 1000ms تفشل بفارق ضئيل على أجهزة بطيئة نسبيًا)
+    expect(
+      await screen.findByText(S.importDone.replace('{tables}', '10'), {}, { timeout: 5000 })
+    ).toBeDefined();
   });
 
   it('ملف غير صحيح يُرفض بلا مساس بالبيانات', async () => {

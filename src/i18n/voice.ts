@@ -267,7 +267,6 @@ export const voice = {
     reopen: 'إعادة فتح',
     delete: 'حذف',
     edit: 'تعديل',
-    save: 'حفظ',
     cancel: 'إلغاء'
   },
   system: {

@@ -13,7 +13,7 @@ import { recomputePlan, type RecoveryPlan } from '../engines/recoveryEngine';
 import { localDateTimeISO } from '../engines/calendarEngine';
 import type { TaskRecord, CalendarEvent, CalendarEventKind } from '../types';
 
-export interface NewEventData {
+interface NewEventData {
   title: string;
   kind: CalendarEventKind;
   dateKey: string; // YYYY-MM-DD محلي

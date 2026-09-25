@@ -24,7 +24,7 @@ const API_BASE = 'https://api.aladhan.com/v1/timings';
 /** method=5 → الهيئة المصرية العامة للمساحة (افتراضي مناسب) */
 const DEFAULT_METHOD = 5;
 
-export const PRAYER_KEYS: PrayerKey[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+const PRAYER_KEYS: PrayerKey[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
 
 function toDDMMYYYY(dateKey: string): string {
   const [y, m, d] = dateKey.split('-');

@@ -1,10 +1,10 @@
 // ============================================================
-// رِفق — System Repository (Settings, ShariaText, Backup)
+// رِفق — System Repository (Settings, ShariaText)
 // ============================================================
 
 import { db } from '../schema';
 import { BaseRepository } from './baseRepository';
-import type { Settings, ShariaText, BackupSnapshot } from '../../types';
+import type { Settings, ShariaText } from '../../types';
 
 class SettingsRepository {
   constructor(private readonly table: typeof db.settings) {}
@@ -63,21 +63,5 @@ class ShariaTextRepository extends BaseRepository<ShariaText> {
   }
 }
 
-class BackupRepository extends BaseRepository<BackupSnapshot> {
-  constructor() {
-    super(db.backups);
-  }
-
-  async saveSnapshot(snapshot: BackupSnapshot): Promise<void> {
-    await this.table.put(snapshot);
-  }
-
-  async getLatest(): Promise<BackupSnapshot | undefined> {
-    const all = await this.table.toArray();
-    return all.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0];
-  }
-}
-
 export const settingsRepository = new SettingsRepository(db.settings);
 export const shariaTextRepository = new ShariaTextRepository();
-export const backupRepository = new BackupRepository();

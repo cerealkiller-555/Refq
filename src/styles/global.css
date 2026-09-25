@@ -160,15 +160,6 @@ select {
   margin: 0 auto;
 }
 
-.placeholder-card {
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  padding: var(--space-7) var(--space-5);
-  text-align: center;
-  color: var(--color-text-muted);
-  box-shadow: var(--shadow-sm);
-}
-
 /* ===== شاشات الأقسام ===== */
 .screen {
   padding-bottom: var(--space-7);

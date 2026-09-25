@@ -10,9 +10,9 @@
 import { create } from 'zustand';
 import { pathItemRepository, sessionRepository, taskRepository } from '../db/repositories';
 
-export type ActiveKind = 'task' | 'learning';
+type ActiveKind = 'task' | 'learning';
 
-export interface ActiveItem {
+interface ActiveItem {
   id: string;
   kind: ActiveKind;
   title: string;

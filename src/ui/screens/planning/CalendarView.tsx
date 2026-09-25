@@ -27,7 +27,7 @@ import { Button, Card, EmptyState } from '../../components';
 const cal = voice.planning.calendar;
 const KIND_CLASS: Record<CalendarEventKind, string> = { fixed: 'ev-fixed', flexible: 'ev-flexible' };
 
-export type CalendarViewMode = 'day' | 'week' | 'month';
+type CalendarViewMode = 'day' | 'week' | 'month';
 
 /** الوقت المحلي HH:MM لكل ما هو مجدول */
 function timeOf(iso: string | undefined): string {

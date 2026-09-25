@@ -7,7 +7,7 @@
 import type { CalendarEvent, TaskRecord } from '../types';
 
 /** حدوث فعلي لحدث (للأحداث المتكررة يختلف عن event.start الأصلي) */
-export interface EventOccurrence {
+interface EventOccurrence {
   event: CalendarEvent;
   start: string; // ISO
   end: string; // ISO
@@ -144,7 +144,7 @@ export function eventsForWeek(
 }
 
 /** أول يوم (السبت) في شبكة الشهر الحاوي على anchorKey */
-export function monthGridStartKey(anchorKey: string): string {
+function monthGridStartKey(anchorKey: string): string {
   const d = new Date(`${anchorKey}T00:00:00`);
   const first = new Date(d.getFullYear(), d.getMonth(), 1);
   const back = (first.getDay() + 1) % 7; // السبت = بداية أسبوعنا

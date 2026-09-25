@@ -9,7 +9,7 @@
 
 import type { TaskRecord, CalendarEvent } from '../types';
 
-export interface RecoveryInput {
+interface RecoveryInput {
   tasks: TaskRecord[]; // المهام المفتوحة (todo/in_progress)
   fixedEvents?: CalendarEvent[]; // أحداث ثابتة (لا تتحرك)
   startFrom?: string; // ISO تاريخ بدء التوزيع

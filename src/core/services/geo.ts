@@ -3,7 +3,7 @@
 // getCoordinates: يُرجع null عند الرفض/الغياب/المهلة — المتصل يقرر الـfallback.
 // ============================================================
 
-export interface Coordinates {
+interface Coordinates {
   lat: number;
   lon: number;
 }

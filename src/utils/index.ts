@@ -15,11 +15,6 @@ export function nowISO(): string {
   return new Date().toISOString();
 }
 
-/** تاريخ ISO لتاريخ اليوم فقط (YYYY-MM-DD) */
-export function todayISODate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export { formatMinutesArabic } from './format';
 
 /** مفتاح التاريخ المحلي (YYYY-MM-DD) — صحيح لتطبيق شخصي local-first */
@@ -30,14 +25,3 @@ export function localDateKey(d: Date = new Date()): string {
   return `${y}-${m}-${day}`;
 }
 
-/** إضافة أيام لتاريخ معيّن وإرجاع ISO */
-export function addDaysISO(date: string | Date, days: number): string {
-  const d = typeof date === 'string' ? new Date(date) : new Date(date.getTime());
-  d.setDate(d.getDate() + days);
-  return d.toISOString();
-}
-
-/** تنظيف نص — إزالة فراغات زائدة */
-export function cleanText(value: string): string {
-  return value.trim().replace(/\s+/g, ' ');
-}
