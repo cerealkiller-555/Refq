@@ -12,7 +12,6 @@ const NAV_ITEMS = [
   { to: '/', label: 'اليوم', icon: '🏠' },
   { to: '/planning', label: 'التخطيط', icon: '📅' },
   { to: '/myplan', label: voice.myPlan.navLabel, icon: '📚' },
-  { to: '/learning', label: 'رحلتي', icon: '🎓' },
   { to: '/heart', label: 'القلب', icon: '🤍' }
 ];
 

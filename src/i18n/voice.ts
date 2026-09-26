@@ -53,6 +53,7 @@ export const voice = {
     }
   },
   planning: {
+    title: '📅 التخطيط',
     tasksTitle: 'المهام',
     addTitle: 'مهمة جديدة',
     quickAddPlaceholder: 'مهمة جديدة… اكتبيها واضغطي Enter',
@@ -79,7 +80,7 @@ export const voice = {
     empty: 'لا مهام بعد — أضيفي أول مهمة بهدوء.',
     doneTitle: 'أُنجزت',
     calendar: {
-      tabs: { tasks: '📋 المهام', day: '📅 اليوم', week: '🗓️ الأسبوع', month: '🗓️ الشهر' },
+      tabs: { day: '📅 اليوم', week: '🗓️ الأسبوع', month: '🗓️ الشهر' },
       addEventTitle: 'حدث جديد',
       eventName: 'اسم الحدث',
       kind: 'النوع',
@@ -197,7 +198,7 @@ export const voice = {
     todayDone: 'سجّلي اليوم — تقدري تعودي غدًا 🤍'
   },
   learning: {
-    title: '🎓 رحلتي',
+    // مفاتيح الإدارة فقط — موروثة إلى «خطتي»، وبقيتها حُذف مع شاشة «رحلتي»
     addPathTitle: 'مسار جديد',
     pathName: 'اسم المسار (مثل: مادة المحاسبة)',
     pathType: 'نوع المسار',
@@ -209,29 +210,17 @@ export const voice = {
       quran: '📖 قرآن'
     } as Record<string, string>,
     addPath: 'أضيفي المسار',
-    nextStepTitle: 'خطوتك القادمة',
-    nextStepHint: 'ما الذي ستُكملينه بعد ذلك في هذا المسار؟',
-    noNext: 'مافيش عناصر جاية هنا — كله تمام 🤍',
-    itemsTitle: 'عناصر المسار',
     addItemPlaceholder: 'عنصر جديد… (مثل: محاضرة 3)',
     addItem: 'إضافة',
-    doneCount: 'مُنجز',
-    sessions: 'جلسات',
-    addSession: 'سجّلي جلسة',
-    startNow: 'ابدئي الآن',
-    sessionOf: 'جلسة على',
-    empty: 'ابدئي رحلتك بإضافة مسار تعليمي صغير — خطوة واحدة تكفي للبداية 🤍',
-    emptyItems: 'لا عناصر بعد — أضيفي أول خطوة بهدوء.',
-    progressLabel: 'أُنجز {done} من {total}',
     pause: 'إيقاف مؤقت',
-    activate: 'متابعة',
-    noActiveHint: 'أضيفي مسارًا نشطًا وستظهر خطواته هنا.'
+    activate: 'متابعة'
   },
   myPlan: {
     navLabel: 'خطتي',
+    tabs: { plan: '📚 خطتي', tasks: '📋 المهام' },
     title: '📚 خطتي الدراسية',
     subtitle: 'موادكِ الدراسية بخطوات واضحة وجلسات هادئة — ركزي على خطوة واحدة تكفي للتقدم.',
-    empty: 'لا توجد مواد دراسية مضافة بعد — أضيفي مادتك أو مساركِ الأول من شاشة «رحلتي» لتنظيم خطواتها هنا 🤍',
+    empty: 'لا توجد مواد دراسية بعد — أضيفي مادتكِ أو مساركِ الأول بزر «＋ مسار جديد» تحت هنا 🤍',
     progress: 'أُنجز {done} من {total} ({percent}%)',
     whereIStopped: 'آخر توقف:',
     noPreviousSession: 'بداية الرحلة — لم تسجلي جلسات بعد',

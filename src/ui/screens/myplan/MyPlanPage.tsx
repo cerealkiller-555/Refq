@@ -1,19 +1,24 @@
 // ============================================================
-// رِفق — Screen: خطتي (My Plan)
-// واجهة تنفيذية للمواد والمسارات الدراسية — خطوة واحدة وجلسة هادئة.
-// تستند بالكامل على عناصر LearningPath وPathItem وSession القائمة
+// رِفق — Screen: خطتي (MyPlan)
+// تبويبان: 📚 خطتي (المسارات والمواد) + 📋 المهام (TasksPanel).
+// التبويب مقروء من الرابط ?tab=tasks ليخدمه زر «كل المهام» في اليوم.
+// أدوات الإدارة موروثة من شاشة «رحلتي»: مسار جديد، إضافة خطوة،
+// إيقاف مؤقت/استئناف، وحذف — بلا أي ضغط، خطوة واحدة تكفي.
 // ============================================================
 
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useLearningStore } from '../../../core/store/useLearningStore';
 import { useActiveTaskStore } from '../../../core/store/useActiveTaskStore';
 import { nextSteps, pathProgress } from '../../../core/engines/learningEngine';
 import { voice } from '../../../i18n/voice';
 import { Card, Button, Chip, EmptyState } from '../../components';
-import type { PathItem, Session } from '../../../core/types';
+import { TasksPanel } from './TasksPanel';
+import type { LearningPath, LearningPathType, PathItem, Session } from '../../../core/types';
 
 const M = voice.myPlan;
 const L = voice.learning;
+const PATH_TYPES: LearningPathType[] = ['university', 'course', 'religious_science', 'book', 'quran'];
 
 export function MyPlanPage() {
   const paths = useLearningStore((s) => s.paths);
@@ -23,8 +28,21 @@ export function MyPlanPage() {
 
   const activeTask = useActiveTaskStore((s) => s.active);
   const startItem = useActiveTaskStore((s) => s.startItem);
+  const addPath = useLearningStore((s) => s.addPath);
+  const setPathStatus = useLearningStore((s) => s.setPathStatus);
+  const deletePath = useLearningStore((s) => s.deletePath);
 
   const [expandedPaths, setExpandedPaths] = useState<Record<string, boolean>>({});
+  /** إضافة خطوة جديدة — مسار واحد مفتوح في كل مرة */
+  const [itemFormFor, setItemFormFor] = useState<string | null>(null);
+  /** نموذج مسار جديد */
+  const [showAddPath, setShowAddPath] = useState(false);
+  const [pathName, setPathName] = useState('');
+  const [pathType, setPathType] = useState<LearningPathType>('university');
+
+  // التبويب مقروء من الرابط حتى يخدمه زر «كل المهام» في شاشة اليوم
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') === 'tasks' ? 'tasks' : 'plan';
 
   useEffect(() => {
     void load();
@@ -87,6 +105,19 @@ export function MyPlanPage() {
     await startItem(item.id, 'learning', item.title, duration);
   };
 
+  const submitAddPath = async () => {
+    const value = pathName.trim();
+    if (!value) return;
+    await addPath({
+      title: value,
+      type: pathType,
+      status: 'active',
+      order: paths.length + 1
+    } as Omit<LearningPath, 'id' | 'createdAt' | 'updatedAt'>);
+    setPathName('');
+    setShowAddPath(false);
+  };
+
   return (
     <section className="screen myplan-screen">
       <header className="screen-header">
@@ -94,6 +125,30 @@ export function MyPlanPage() {
         <p className="screen-subtitle muted">{M.subtitle}</p>
       </header>
 
+      {/* التبويبان: خطتي | المهام */}
+      <div className="tabs" role="tablist">
+        <button
+          role="tab"
+          aria-selected={activeTab === 'plan'}
+          className={`tab${activeTab === 'plan' ? ' active' : ''}`}
+          onClick={() => setSearchParams({})}
+        >
+          {M.tabs.plan}
+        </button>
+        <button
+          role="tab"
+          aria-selected={activeTab === 'tasks'}
+          className={`tab${activeTab === 'tasks' ? ' active' : ''}`}
+          onClick={() => setSearchParams({ tab: 'tasks' })}
+        >
+          {M.tabs.tasks}
+        </button>
+      </div>
+
+      {activeTab === 'tasks' ? (
+        <TasksPanel />
+      ) : (
+      <>
       {paths.length === 0 ? (
         <Card>
           <EmptyState icon="📚">{M.empty}</EmptyState>
@@ -251,11 +306,141 @@ export function MyPlanPage() {
                     )}
                   </div>
                 )}
+
+                {/* إدارة المسار — إضافة خطوة، إيقاف/استئناف، حذف */}
+                <div className="banner-actions" style={{ marginTop: 'var(--space-3)' }}>
+                  <Button
+                    variant="soft"
+                    onClick={() => setItemFormFor(itemFormFor === path.id ? null : path.id)}
+                  >
+                    ＋ {L.addItem}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => void setPathStatus(path.id, path.status === 'active' ? 'paused' : 'active')}
+                  >
+                    {path.status === 'active' ? L.pause : L.activate}
+                  </Button>
+                  <Button variant="danger" onClick={() => void deletePath(path.id)}>
+                    {voice.common.delete}
+                  </Button>
+                </div>
+                {itemFormFor === path.id && (
+                  <ItemForm
+                    pathId={path.id}
+                    nextOrder={items.length ? Math.max(...items.map((i) => i.order)) + 1 : 1}
+                    onDone={() => setItemFormFor(null)}
+                  />
+                )}
               </Card>
             );
           })}
         </div>
       )}
+
+      {/* مسار جديد — يفتح عند الطلب */}
+      {showAddPath ? (
+        <Card title={L.addPathTitle} icon="➕">
+          <div className="add-form">
+            <input
+              className="text-input"
+              placeholder={L.pathName}
+              aria-label={L.pathName}
+              value={pathName}
+              autoFocus
+              onChange={(e) => setPathName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void submitAddPath();
+              }}
+            />
+            <div className="form-row">
+              <div className="form-field">
+                <label>{L.pathType}</label>
+                <select
+                  className="text-input"
+                  value={pathType}
+                  onChange={(e) => setPathType(e.target.value as LearningPathType)}
+                >
+                  {PATH_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {L.types[t]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-field" style={{ alignSelf: 'flex-end' }}>
+                <Button onClick={() => void submitAddPath()}>{L.addPath}</Button>
+              </div>
+            </div>
+            <div className="row">
+              <Button variant="ghost" size="sm" onClick={() => setShowAddPath(false)}>
+                {voice.common.cancel}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <div className="row" style={{ justifyContent: 'center' }}>
+          <Button variant="soft" onClick={() => setShowAddPath(true)}>＋ {L.addPathTitle}</Button>
+        </div>
+      )}
+      </>
+      )}
     </section>
   );
 }
+
+/** نموذج إضافة خطوة إلى مسار — مورود من شاشة «رحلتي» القديمة */
+function ItemForm({ pathId, nextOrder, onDone }: { pathId: string; nextOrder: number; onDone: () => void }) {
+  const addItem = useLearningStore((s) => s.addItem);
+  const [title, setTitle] = useState('');
+  const [duration, setDuration] = useState(30);
+
+  const submit = async () => {
+    const value = title.trim();
+    if (!value) return;
+    await addItem({
+      pathId,
+      title: value,
+      order: nextOrder,
+      status: 'todo',
+      estimatedDuration: duration
+    } as Omit<PathItem, 'id' | 'createdAt' | 'updatedAt'>);
+    setTitle('');
+    setDuration(30);
+    onDone();
+  };
+
+  return (
+    <div className="add-form">
+      <div className="form-row">
+        <input
+          className="text-input"
+          placeholder={L.addItemPlaceholder}
+          aria-label={L.addItemPlaceholder}
+          value={title}
+          autoFocus
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void submit();
+          }}
+        />
+        <div className="form-field" style={{ minWidth: 90, maxWidth: 140 }}>
+          <input
+            className="text-input"
+            type="number"
+            min={5}
+            step={5}
+            value={duration}
+            aria-label={voice.today.suggestion.minutes}
+            onChange={(e) => setDuration(Math.max(5, parseInt(e.target.value, 10) || 5))}
+          />
+        </div>
+        <Button variant="soft" onClick={() => void submit()}>
+          {L.addItem}
+        </Button>
+      </div>
+    </div>
+  );
+}
+

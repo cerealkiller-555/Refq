@@ -390,7 +390,7 @@ export function TodayPage() {
           <ul className="task-list">{todays.map(renderTaskRow)}</ul>
         )}
         {restCount > 0 && (
-          <Link className="link-planning" to="/planning">
+          <Link className="link-planning" to="/myplan?tab=tasks">
             {voice.today.tasks.seeAll.replace('{count}', String(restCount))}
           </Link>
         )}

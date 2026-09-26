@@ -753,41 +753,6 @@ select {
   transform: scale(1.1);
 }
 
-/* ===== P3 — رحلتي (Learning) ===== */
-
-.next-step {
-  background: var(--color-accent-soft);
-  border-radius: var(--radius-md);
-  padding: var(--space-3);
-  margin-bottom: var(--space-3);
-}
-
-.next-step-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: var(--space-2) 0;
-  flex-wrap: wrap;
-}
-
-.session-prompt {
-  background: var(--color-warning-soft);
-  border-radius: var(--radius-md);
-  padding: var(--space-3);
-  margin-bottom: var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.learning-items .section-divider {
-  margin-top: var(--space-4);
-}
-
-.learning-items .add-form {
-  margin-top: var(--space-3);
-}
-
 /* ===== أزرار صغيرة ===== */
 
 .btn-sm {
@@ -864,7 +829,7 @@ select {
 }
 
 /* ============================================================
-   P1 UX — ترتيب عملي (اليوم / التخطيط / رحلتي)
+   P1 UX — ترتيب عملي (اليوم / التخطيط / خطتي)
    ============================================================ */
 
 /* طاقة اليوم بعد التسجيل — سطر واحد هادئ */
@@ -914,14 +879,6 @@ select {
   font-family: inherit;
 }
 
-/* الخطوة القادمة — كارت رحلتي العلوي */
-.next-step-global .next-step-item {
-  flex-wrap: wrap;
-}
-
-.next-step-global .banner-actions {
-  margin-top: var(--space-2);
-}
 /* ============================================================
    خطتي — My Plan (المواد والجلسات والخطوة القادمة)
    ============================================================ */
