@@ -24,7 +24,7 @@ import {
   taskRepository,
   calendarRepository
 } from '../../src/core/db/repositories';
-import { localDateTimeISO, todayKey, addDaysKey } from '../../src/core/engines/calendarEngine';
+import { localDateTimeISO, todayKey, addDaysKey, dateKey } from '../../src/core/engines/calendarEngine';
 import { voice } from '../../src/i18n/voice';
 import type { LearningPath, PathItem, TaskRecord } from '../../src/core/types';
 
@@ -236,7 +236,8 @@ describe('MyPlanPage UI — تبويب المهام', () => {
     const updated = await taskRepository.get(overdueTask.id);
     const sched = updated?.scheduledAt;
     expect(sched).toBeTruthy();
-    expect(sched!.slice(0, 10) >= todayKey()).toBe(true);
+    // نقرأ اليوم المحلي لـ scheduledAt (المُولَّد بتوقيت الجهاز) لا شريحة UTC
+    expect(dateKey(new Date(sched!)) >= todayKey()).toBe(true);
 
     // رسالة النجاح اللطيفة ظهرت واللافتة الأصلية اختفت
     expect(screen.getByText(cal.recovery.applied)).toBeDefined();

@@ -24,7 +24,8 @@ import {
   weekDayKeys,
   addDaysKey,
   formatEventTime,
-  localDateTimeISO
+  localDateTimeISO,
+  dateKey
 } from '../src/core/engines/calendarEngine';
 import type { TaskRecord, CalendarEvent, PrayerAnchor } from '../src/core/types';
 
@@ -172,7 +173,10 @@ describe('RecoveryEngine', () => {
       fixedEvents: [fixed]
     });
     // يجب ألا توضع في نفس يوم الحدث الثابت
-    expect(plan.moved[0]?.scheduledAt.slice(0, 10)).not.toBe('2026-01-11');
+    // نقرأ اليوم المحلي لـ scheduledAt (minutesToISOOnDay يبني 9 صباحًا بتوقيت الجهاز)
+    const firstAssigned = plan.moved[0]?.scheduledAt;
+    expect(firstAssigned).toBeTruthy();
+    expect(firstAssigned ? dateKey(new Date(firstAssigned)) : '').not.toBe('2026-01-11');
   });
 
   it('رسالة لطيفة بدون جلد الذات', () => {
@@ -358,7 +362,10 @@ describe('RecoveryEngine P1', () => {
     // المراسي ليست مهامًا — لا تُحرك أبدًا
     expect(plan.moved.every((m) => m.taskId !== prayer.id)).toBe(true);
     // سعة يوم الصلاة = 300 - 20 = 280 → المهمة (100) تتسع فيه
-    expect(plan.moved[0]?.scheduledAt.slice(0, 10)).toBe('2026-01-11');
+    // نقرأ اليوم المحلي لـ scheduledAt حتى لا تختلف النتيجة بفرق التوقيت
+    const firstAssigned = plan.moved[0]?.scheduledAt;
+    expect(firstAssigned).toBeTruthy();
+    expect(firstAssigned ? dateKey(new Date(firstAssigned)) : '').toBe('2026-01-11');
   });
 
   it('المهام المجدولة في أيام فاتت تُكتشف للافتة اللطيفة — والمكتملة والمحررة لا', () => {
@@ -446,9 +453,18 @@ describe('CalendarEngine', () => {
   });
 
   it('eventsForDay يرتب الأحداث زمنيًا داخل اليوم المحلي', () => {
+    // لحظات مبنية على «اليوم المحلي» حتى لا يتأثر الاختبار بفرق التوقيت (UTC±)
     const events = [
-      makeEvent({ id: 'late', start: '2026-01-10T14:00:00.000Z', end: '2026-01-10T15:00:00.000Z' }),
-      makeEvent({ id: 'early', start: '2026-01-10T07:00:00.000Z', end: '2026-01-10T08:00:00.000Z' })
+      makeEvent({
+        id: 'late',
+        start: localDateTimeISO('2026-01-10', '14:00'),
+        end: localDateTimeISO('2026-01-10', '15:00')
+      }),
+      makeEvent({
+        id: 'early',
+        start: localDateTimeISO('2026-01-10', '07:00'),
+        end: localDateTimeISO('2026-01-10', '08:00')
+      })
     ];
     const day = eventsForDay(events, '2026-01-10');
     expect(day.map((o) => o.event.id)).toEqual(['early', 'late']);
@@ -462,8 +478,13 @@ describe('CalendarEngine', () => {
     expect(days[0]).toBe('2026-01-10');
     expect(days[6]).toBe('2026-01-16');
 
+    // لحظة بتوقيت الجهاز المحلي حتى يقع الحدث في يومه المحلي مهما كانت الإزاحة (UTC±)
     const events = [
-      makeEvent({ id: 'a', start: '2026-01-11T09:00:00.000Z', end: '2026-01-11T10:00:00.000Z' })
+      makeEvent({
+        id: 'a',
+        start: localDateTimeISO('2026-01-11', '09:00'),
+        end: localDateTimeISO('2026-01-11', '10:00')
+      })
     ];
     const byDay = eventsForWeek(events, '2026-01-10');
     expect(byDay.get('2026-01-10')).toHaveLength(0);
@@ -494,7 +515,8 @@ describe('CalendarEngine', () => {
     const d = new Date(iso);
     expect(d.getHours()).toBe(14);
     expect(d.getMinutes()).toBe(30);
-    expect(iso.slice(0, 10)).toBe('2026-01-10');
+    // تاريخ محلي مطابق بعد التحويل ذهابًا وإيابًا (شريحة ISO قد تختلف يوميًا عند UTC±)
+    expect(dateKey(d)).toBe('2026-01-10');
   });
 });
 

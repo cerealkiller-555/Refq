@@ -9,7 +9,7 @@
 // ============================================================
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, cleanup, act } from '@testing-library/react';
+import { render, screen, waitFor, cleanup, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TodayPage } from '../../src/ui/screens/today/TodayPage';
 import { useTodayStore } from '../../src/core/store/useTodayStore';
@@ -151,7 +151,11 @@ describe('TodayPage — فترات الصلاة (P3)', () => {
 
     render(<TodayPage />);
 
-    expect(await screen.findByText(/ليل/)).toBeDefined();
+    // لافتة الفترة (role=status) — نصها الدقيق من i18n لا يتعارض مع تحية «ليلة طيبة»
+    // التي تظهر في <h2> أثناء ساعات الليل (منع أي تكرار نص ليلي)
+    const banner = await screen.findByRole('status');
+    expect(within(banner).getByText(voice.today.period.nightOpen)).toBeDefined();
+
     expect((screen.getByRole('button', { name: '45 دقيقة' }) as HTMLButtonElement).disabled).toBe(false);
     expect((screen.getByRole('button', { name: '60 دقيقة' }) as HTMLButtonElement).disabled).toBe(false);
   });
