@@ -60,6 +60,9 @@ export async function importAll(snapshot: BackupSnapshot): Promise<string[]> {
   const d = snapshot.data;
   const results: string[] = [];
 
+  // كاش جوجل خارج النسخة الاحتياطية (بيانات جوجل تُعاد مزامنتها) — يُمسح حتى لا يبقى stale
+  await db.googleEventsCache.clear();
+
   if (d.tasks) { await db.tasks.clear(); await db.tasks.bulkPut(d.tasks); results.push('tasks'); }
   if (d.calendarEvents) { await db.calendarEvents.clear(); await db.calendarEvents.bulkPut(d.calendarEvents); results.push('calendarEvents'); }
   if (d.paths) { await db.paths.clear(); await db.paths.bulkPut(d.paths); results.push('paths'); }
@@ -87,7 +90,8 @@ export async function deleteAllData(): Promise<void> {
     db.shariaTexts.clear(),
     db.prayerAnchors.clear(),
     db.settings.clear(),
-    db.backups.clear()
+    db.backups.clear(),
+    db.googleEventsCache.clear()
   ]);
 }
 

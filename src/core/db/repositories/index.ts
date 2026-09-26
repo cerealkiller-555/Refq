@@ -11,3 +11,4 @@ export * from './heartRepository';
 export * from './systemRepository';
 export * from './shariaRepository';
 export * from './prayerAnchorRepository';
+export * from './googleCalendarRepository';

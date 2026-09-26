@@ -22,3 +22,5 @@ Thumbs.db
 # Env
 .env
 .env.*
+# نموذج المتغيرات يُرفع مع الكود
+!.env.example

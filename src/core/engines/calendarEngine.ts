@@ -198,6 +198,16 @@ export function weekStartKey(dayKey: string): string {
   return addDaysKey(dayKey, -((d.getDay() + 1) % 7));
 }
 
+/**
+ * دمج الأحداث المحلية مع كاش أحداث جوجل (قراءة فقط) في قائمة واحدة مرتبة.
+ * الدمج هنا وليس في المحرك: أحداث جوجل لا تدخل إعادة التوزيع إطلاقًا.
+ */
+export function mergeEventSources(local: CalendarEvent[], google: CalendarEvent[]): CalendarEvent[] {
+  return [...local, ...google].sort(
+    (a, b) => a.start.localeCompare(b.start) || a.title.localeCompare(b.title)
+  );
+}
+
 /** تنسيق وقت الحدث للعرض — "09:00–10:30" (بلا تواريخ مطلقة) */
 export function formatEventTime(start: string, end: string): string {
   const fmt = (iso: string) => {

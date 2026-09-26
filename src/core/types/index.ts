@@ -50,6 +50,10 @@ export interface CalendarEvent extends Timestamps {
   pathId?: ID;
   itemId?: ID;
   note?: string;
+  /** أصل الحدث — local (افتراضي) أو google (مزامنة قراءة فقط) */
+  source?: 'local' | 'google';
+  /** حدث ليوم كامل (من جوجل: start.date بلا وقت) */
+  allDay?: boolean;
 }
 
 // ===== Learning =====

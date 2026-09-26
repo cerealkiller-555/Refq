@@ -18,7 +18,8 @@ import {
   formatEventTime,
   dateKey,
   monthOfKey,
-  monthGridKeys
+  monthGridKeys,
+  mergeEventSources
 } from '../../../core/engines/calendarEngine';
 import type { CalendarEventKind } from '../../../core/types';
 import { voice } from '../../../i18n/voice';
@@ -43,18 +44,30 @@ function dayNameOf(dayKey: string): string {
 }
 
 interface OccLike {
-  event: { id: string; title: string; kind: CalendarEventKind };
+  event: {
+    id: string;
+    title: string;
+    kind: CalendarEventKind;
+    source?: 'local' | 'google';
+    allDay?: boolean;
+  };
   start: string;
   end: string;
 }
 
+/** صف_class الحدث — أحداث جوجل تُعلَّم بلون مختلف وتُعرض بلا زر حذف (قراءة فقط) */
+function occClass(occ: OccLike): string {
+  return `event-row ${KIND_CLASS[occ.event.kind]}${occ.event.source === 'google' ? ' ev-google' : ''}`;
+}
+
 function EventRow({ occ, onDelete }: { occ: OccLike; onDelete?: (id: string) => void }) {
+  const isGoogle = occ.event.source === 'google';
   return (
-    <li className={`event-row ${KIND_CLASS[occ.event.kind]}`}>
-      <span className="event-time">{formatEventTime(occ.start, occ.end)}</span>
+    <li className={occClass(occ)}>
+      <span className="event-time">{occ.event.allDay ? cal.allDayLabel : formatEventTime(occ.start, occ.end)}</span>
       <span className="event-title">{occ.event.title}</span>
-      <span className="event-kind">{cal.kindLabels[occ.event.kind]}</span>
-      {onDelete && (
+      <span className="event-kind">{isGoogle ? cal.googleLabel : cal.kindLabels[occ.event.kind]}</span>
+      {onDelete && !isGoogle && (
         <button className="task-delete" aria-label={voice.common.delete} onClick={() => onDelete(occ.event.id)}>
           ×
         </button>
@@ -122,11 +135,15 @@ function EventForm({ dayKeyStr, onDone }: { dayKeyStr: string; onDone: () => voi
 /** عرض اليوم: أحداث اليوم + مهامه المجدولة في مكان واحد */
 function DayView({ dayKeyStr, onOpenDay }: { dayKeyStr: string; onOpenDay: (key: string) => void }) {
   const events = usePlanningStore((s) => s.events);
+  const googleEvents = usePlanningStore((s) => s.googleEvents);
   const tasks = usePlanningStore((s) => s.tasks);
   const deleteEvent = usePlanningStore((s) => s.deleteEvent);
   const [showForm, setShowForm] = useState(false);
 
-  const dayEvents = useMemo(() => eventsForDay(events, dayKeyStr), [events, dayKeyStr]);
+  const dayEvents = useMemo(
+    () => eventsForDay(mergeEventSources(events, googleEvents), dayKeyStr),
+    [events, googleEvents, dayKeyStr]
+  );
   const dayTasks = useMemo(() => groupTasksByDay(tasks).get(dayKeyStr) ?? [], [tasks, dayKeyStr]);
   const label = `${dayNameOf(dayKeyStr)} ${dayKeyStr}`;
 
@@ -186,11 +203,13 @@ function DayView({ dayKeyStr, onOpenDay }: { dayKeyStr: string; onOpenDay: (key:
 /** عرض الأسبوع: 7 أعمدة، وفي كل يوم المهام المجدولة ثم الأحداث */
 function WeekView({ anchorKey, onOpenDay }: { anchorKey: string; onOpenDay: (key: string) => void }) {
   const events = usePlanningStore((s) => s.events);
+  const googleEvents = usePlanningStore((s) => s.googleEvents);
   const tasks = usePlanningStore((s) => s.tasks);
 
   const start = weekStartKey(anchorKey);
   const days = useMemo(() => weekDayKeys(start), [start]);
-  const byDay = useMemo(() => eventsForWeek(events, start), [events, start]);
+  const allEvents = useMemo(() => mergeEventSources(events, googleEvents), [events, googleEvents]);
+  const byDay = useMemo(() => eventsForWeek(allEvents, start), [allEvents, start]);
   const tasksByDay = useMemo(() => groupTasksByDay(tasks), [tasks]);
 
   const countTasks = days.reduce((sum, k) => sum + (tasksByDay.get(k)?.length ?? 0), 0);
@@ -229,8 +248,13 @@ function WeekView({ anchorKey, onOpenDay }: { anchorKey: string; onOpenDay: (key
                   </li>
                 ))}
                 {(byDay.get(key) ?? []).map((occ) => (
-                  <li key={`${occ.event.id}-${occ.start}`} className={`event-chip ${KIND_CLASS[occ.event.kind]}`}>
-                    <span className="event-time">{formatEventTime(occ.start, occ.end)}</span>
+                  <li
+                    key={`${occ.event.id}-${occ.start}`}
+                    className={`event-chip ${KIND_CLASS[occ.event.kind]}${occ.event.source === 'google' ? ' ev-google' : ''}`}
+                  >
+                    <span className="event-time">
+                      {occ.event.allDay ? cal.allDayLabel : formatEventTime(occ.start, occ.end)}
+                    </span>
                     {occ.event.title}
                   </li>
                 ))}
@@ -245,10 +269,12 @@ function WeekView({ anchorKey, onOpenDay }: { anchorKey: string; onOpenDay: (key
 /** عرض الشهر: شبكة 6×7 — كل يوم بعدّاد مهامه وأحداثه، والضغط يفتحه */
 function MonthView({ anchorKey, onOpenDay }: { anchorKey: string; onOpenDay: (key: string) => void }) {
   const events = usePlanningStore((s) => s.events);
+  const googleEvents = usePlanningStore((s) => s.googleEvents);
   const tasks = usePlanningStore((s) => s.tasks);
 
   const keys = useMemo(() => monthGridKeys(anchorKey), [anchorKey]);
-  const byDay = useMemo(() => eventsForMonth(events, anchorKey), [events, anchorKey]);
+  const allEvents = useMemo(() => mergeEventSources(events, googleEvents), [events, googleEvents]);
+  const byDay = useMemo(() => eventsForMonth(allEvents, anchorKey), [allEvents, anchorKey]);
   const tasksByDay = useMemo(() => groupTasksByDay(tasks), [tasks]);
 
   const month = monthOfKey(anchorKey);

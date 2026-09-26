@@ -38,6 +38,40 @@
 | 🤍 القلب | أثر، فتش عن قلبك، وقفة أسبوعية، محاسبة اختيارية |
 | ⚙️ النظام | الإعدادات، النسخ الاحتياطي (تصدير/استيراد)، حذف الكل |
 
+## 🔗 مزامنة Google Calendar (قراءة فقط)
+
+رِفق تقدر تجيب أحداث تقويمك من Google وتعرضها مع أحداثك في التقويم — **قراءة فقط**:
+لا تُنشئ ولا تُعدّل ولا تحذف أي حدث في Google، والنطاق المستخدم هو `calendar.readonly`.
+
+**سياسة الخصوصية (مقصودة):**
+
+- رمز الوصول يبقى **في ذاكرة الصفحة فقط** — لا Dexie، لا `localStorage`، ولا يدخل النسخ الاحتياطية.
+- أحداث Google تُخزَّن موقتًا في جدول `googleEventsCache` للعرض السريع، وهي **مستثناة من النسخ الاحتياطية**
+  (تُعاد مزامنتها من Google)، وتُمسح عند الاستيراد أو «حذف كل البيانات» أو فك الربط.
+- مدة الرمز ساعتان؛ بعده يلزم ضغط «مزامنة الآن» + إعادة الربط (لا refresh token في المتصفح).
+- المزامنة يدوية من ⚙️ النظام (لا طلبات صامتة في الخلفية)، وأحداث Google تُعلَّم بشارة `Google`
+  **بلا زر حذف** لأنها لا تُحرَّر من رِفق.
+
+**التفعيل (خطوة واحدة لكل بيئة):**
+
+1. في [Google Cloud Console](https://console.cloud.google.com/apis/credentials): أنشئ **OAuth client ID**
+   من نوع **Web application**، وفعّل **Google Calendar API**، ثم أضِف *Authorized JavaScript origins*:
+   - للتطوير: `http://localhost:5173` (و`http://localhost:4173` لو جرّبت `npm run preview`)
+   - للإنتاج: رابط GitHub Pages الخاص بالتطبيق (مثال: `https://<user>.github.io`)
+   - *Authorized redirect URIs*: ليست مطلوبة (تدفق `token` عبر Google Identity Services).
+2. محليًا: انسخي `.env.example` إلى `.env.local` واملئي:
+
+   ```bash
+   VITE_GOOGLE_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
+   ```
+
+   ثم أعادي تشغيل `npm run dev`.
+3. الإنتاج: أضيفي نفس الاسم كـ **repository secret** باسم `VITE_GOOGLE_CLIENT_ID` —
+   workflow البناء يقرأه تلقائيًا (`secrets.VITE_GOOGLE_CLIENT_ID`).
+
+> **بدون المعرّف:** كل شيء يعمل كما كان — بطاقة Google Calendar في ⚙️ النظام تعرض رسالة
+> «السجل ما مضبوط بعد» وتبقى المزامنة معطّلة بأمان (لا أزرار ميتة، لا أخطاء).
+
 ## التشغيل
 
 ```bash

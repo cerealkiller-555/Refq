@@ -14,6 +14,12 @@ import {
   isVersionSupported
 } from '../../../utils/backup';
 import type { BackupSnapshot } from '../../../core/types';
+import {
+  isGoogleCalendarConfigured,
+  isGoogleCalendarConnected,
+  requestGoogleAccessToken
+} from '../../../core/integrations/googleCalendar';
+import { usePlanningStore } from '../../../core/store/usePlanningStore';
 import { voice } from '../../../i18n/voice';
 import { Button, Card } from '../../components';
 
@@ -69,6 +75,15 @@ export function SettingsPage() {
   const [pendingName, setPendingName] = useState('');
   const [askDelete, setAskDelete] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // ===== Google Calendar — قراءة فقط (الرمز في الذاكرة ولا يُخزَّن أبدًا) =====
+  const googleEvents = usePlanningStore((s) => s.googleEvents);
+  const googleSyncAt = usePlanningStore((s) => s.googleSyncAt);
+  const syncGoogle = usePlanningStore((s) => s.syncGoogle);
+  const disconnectGoogle = usePlanningStore((s) => s.disconnectGoogle);
+  const [googleBusy, setGoogleBusy] = useState<null | 'connect' | 'sync' | 'disconnect'>(null);
+  const [googleConnected, setGoogleConnected] = useState(isGoogleCalendarConnected());
+  const googleConfigured = isGoogleCalendarConfigured();
 
   const refreshInfo = useCallback(async () => {
     try {
@@ -153,6 +168,54 @@ export function SettingsPage() {
     }
   };
 
+  /** الربط: نافذة جوجل → رمز في الذاكرة فقط → مزامنة أولى تلقائية */
+  const handleGoogleConnect = async () => {
+    setGoogleBusy('connect');
+    setNote(null);
+    try {
+      await requestGoogleAccessToken();
+      setGoogleConnected(true);
+      const count = await syncGoogle();
+      setNote({ text: S.googleSyncDone.replace('{count}', String(count)), tone: 'ok' });
+    } catch {
+      setNote({ text: S.errorGeneric, tone: 'error' });
+    } finally {
+      setGoogleBusy(null);
+    }
+  };
+
+  /** مزامنة يدوية: جلب النطاق الزمني واستبدال الكاش المحلي */
+  const handleGoogleSync = async () => {
+    setGoogleBusy('sync');
+    setNote(null);
+    try {
+      const count = await syncGoogle();
+      setNote({ text: S.googleSyncDone.replace('{count}', String(count)), tone: 'ok' });
+    } catch {
+      setNote({ text: S.errorGeneric, tone: 'error' });
+    } finally {
+      setGoogleBusy(null);
+    }
+  };
+
+  /** فك الربط: محو الرمز من الذاكرة + تفريغ الأحداث المعروضة */
+  const handleGoogleDisconnect = async () => {
+    setGoogleBusy('disconnect');
+    try {
+      await disconnectGoogle();
+      setGoogleConnected(false);
+      setNote(null);
+    } catch {
+      setNote({ text: S.errorGeneric, tone: 'error' });
+    } finally {
+      setGoogleBusy(null);
+    }
+  };
+
+  const googleLastSync = googleSyncAt
+    ? S.googleLastSync.replace('{time}', new Date(googleSyncAt).toLocaleString())
+    : S.googleNeverSynced;
+
   return (
     <section className="screen">
       <h2 className="screen-title">{S.title}</h2>
@@ -214,6 +277,39 @@ export function SettingsPage() {
             <Button variant="soft" onClick={() => fileRef.current?.click()} disabled={busy !== null}>
               {S.importButton}
             </Button>
+          </div>
+        )}
+      </Card>
+
+      <Card title={S.googleTitle} icon="🗓️">
+        <p className="muted">{S.googleHint}</p>
+        {!googleConfigured ? (
+          <div className="banner-actions">
+            <p className="section-divider">{S.googleNotConfigured}</p>
+          </div>
+        ) : !googleConnected ? (
+          <div className="banner-actions">
+            <Button onClick={() => void handleGoogleConnect()} disabled={googleBusy !== null}>
+              {googleBusy === 'connect' ? S.googleConnecting : S.googleConnect}
+            </Button>
+          </div>
+        ) : (
+          <div className="add-form">
+            <p className="section-divider">{S.googleConnected}</p>
+            <p className="muted">{googleLastSync}</p>
+            <p className="muted">
+              {googleEvents.length > 0
+                ? S.googleEventsCount.replace('{count}', String(googleEvents.length))
+                : S.googleNoEvents}
+            </p>
+            <div className="banner-actions">
+              <Button variant="soft" onClick={() => void handleGoogleSync()} disabled={googleBusy !== null}>
+                {googleBusy === 'sync' ? S.googleSyncing : S.googleSync}
+              </Button>
+              <Button variant="ghost" onClick={() => void handleGoogleDisconnect()} disabled={googleBusy !== null}>
+                {S.googleDisconnect}
+              </Button>
+            </div>
           </div>
         )}
       </Card>

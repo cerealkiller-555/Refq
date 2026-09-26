@@ -20,7 +20,7 @@ import type {
 } from '../types';
 
 const DB_NAME = 'refq';
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 const V1_STORES = {
   tasks: 'id, status, scheduledAt, deadline, linkedPathItemId, order',
@@ -51,6 +51,8 @@ export interface RefqDatabase extends Dexie {
   backups: Table<BackupSnapshot, string>;
   /** v2 — مراسي الصلوات (تأسيس معماري؛ لا UI في P1) */
   prayerAnchors: Table<PrayerAnchor, string>;
+  /** v4 — كاش أحداث Google Calendar (قراءة فقط؛ مستثنى من النسخة الاحتياطية) */
+  googleEventsCache: Table<CalendarEvent, string>;
 }
 
 class RefqDatabaseImpl extends Dexie {
@@ -65,6 +67,7 @@ class RefqDatabaseImpl extends Dexie {
   settings!: Table<Settings, string>;
   backups!: Table<BackupSnapshot, string>;
   prayerAnchors!: Table<PrayerAnchor, string>;
+  googleEventsCache!: Table<CalendarEvent, string>;
 
   constructor() {
     super(DB_NAME);
@@ -78,6 +81,10 @@ class RefqDatabaseImpl extends Dexie {
       notes: null,
       noteIndexes: null,
       folders: null
+    });
+    // v4 — كاش أحداث Google Calendar (مزامنة قراءة فقط، مستثنى من النسخ الاحتياطية)
+    this.version(4).stores({
+      googleEventsCache: 'id, start, source'
     });
   }
 }
@@ -96,7 +103,8 @@ export const dbSchema = {
     'shariaTexts',
     'prayerAnchors',
     'settings',
-    'backups'
+    'backups',
+    'googleEventsCache'
   ]
 };
 

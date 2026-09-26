@@ -7,10 +7,12 @@
 import { create } from 'zustand';
 import {
   taskRepository,
-  calendarRepository
+  calendarRepository,
+  googleCalendarRepository
 } from '../db/repositories';
 import { recomputePlan, type RecoveryPlan } from '../engines/recoveryEngine';
 import { localDateTimeISO } from '../engines/calendarEngine';
+import { syncWithStoredToken, disconnectGoogleCalendar } from '../integrations/googleCalendar';
 import type { TaskRecord, CalendarEvent, CalendarEventKind } from '../types';
 
 interface NewEventData {
@@ -26,6 +28,10 @@ interface PlanningState {
   tasks: TaskRecord[];
   events: CalendarEvent[];
   replanResult: RecoveryPlan | null;
+  /** أحداث Google Calendar المخزّنة (قراءة فقط — لا تدخل أي عمليات كتابة) */
+  googleEvents: CalendarEvent[];
+  /** متى آخر مزامنة ناجحة (ISO) — null إن لم يحدث بعد */
+  googleSyncAt: string | null;
   load: () => Promise<void>;
   // ===== مهام =====
   addTask: (task: Omit<TaskRecord, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
@@ -40,6 +46,9 @@ interface PlanningState {
   deleteEvent: (id: string) => Promise<void>;
   // ===== ربط المهام بالتقويم =====
   scheduleTask: (taskId: string, dateKey: string, time: string) => Promise<void>;
+  // ===== مزامنة جوجل (قراءة فقط) =====
+  syncGoogle: () => Promise<number>;
+  disconnectGoogle: () => Promise<void>;
   // ===== التعافي =====
   replan: () => Promise<RecoveryPlan>;
   clearReplanResult: () => void;
@@ -54,13 +63,16 @@ export const usePlanningStore = create<PlanningState>((set) => ({
   tasks: [],
   events: [],
   replanResult: null,
+  googleEvents: [],
+  googleSyncAt: null,
 
   load: async () => {
-    const [tasks, events] = await Promise.all([
+    const [tasks, events, googleEvents] = await Promise.all([
       taskRepository.getAll(),
-      calendarRepository.getAll()
+      calendarRepository.getAll(),
+      googleCalendarRepository.getAll()
     ]);
-    set({ tasks, events });
+    set({ tasks, events, googleEvents });
   },
 
   addTask: async (task) => {
@@ -154,6 +166,25 @@ export const usePlanningStore = create<PlanningState>((set) => ({
     ]);
     set({ tasks, events });
   },
+
+  /**
+   * مزامنة قراءة فقط مع Google Calendar: جلب النطاق الزمني ثم استبدال الكاش.
+   * يعيد عدد الأحداث المخزّنة. الفشل يرمي خطأ يعالجه الـUI بلطف.
+   */
+  syncGoogle: async () => {
+    const result = await syncWithStoredToken();
+    await googleCalendarRepository.replaceAll(result.events);
+    set({ googleEvents: result.events, googleSyncAt: result.syncedAt });
+    return result.events.length;
+  },
+
+  /** قطع الاتصال: إسقاط الرمز من الذاكرة + تفريغ الكاش المعروض */
+  disconnectGoogle: async () => {
+    await disconnectGoogleCalendar();
+    await googleCalendarRepository.replaceAll([]);
+    set({ googleEvents: [], googleSyncAt: null });
+  },
+
 
   /** إعادة التوزيع اللطيفة — الثوابت لا تُلمس أبدًا */
   replan: async () => {

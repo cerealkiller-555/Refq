@@ -19,6 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DEPLOY_BASE: /Refq/
+      # معرّف عميل Google Calendar (سر اختياري في GitHub Secrets).
+      # غيابه يبني التطبيق بنفس الشكل — المزامنة تكون معطّلة في الواجهة.
+      VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
     steps:
       - uses: actions/checkout@v4
 

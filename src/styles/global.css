@@ -19,6 +19,9 @@
   --color-danger-soft: #f0dcd8;
   --color-warning: #c08a45;
   --color-warning-soft: #f6ead8;
+  /* أحداث Google Calendar (قراءة فقط) */
+  --color-google: #4285f4;
+  --color-google-soft: #e3ecfb;
 
   /* طاقة */
   --color-energy-low: #c08a45;
@@ -78,6 +81,8 @@
     --color-danger-soft: #5a3a36;
     --color-warning: #d8a860;
     --color-warning-soft: #54442d;
+    --color-google: #8ab4f8;
+    --color-google-soft: #2f3b52;
     --color-energy-low: #d8a860;
     --color-energy-low-soft: #54442d;
     --color-energy-medium: #b9c26e;
@@ -649,6 +654,12 @@ select {
   border-right-color: var(--color-accent);
 }
 
+/* أحداث Google — قراءة فقط: لون مميز مختلف عن الثابت/المرن */
+.event-row.ev-google {
+  background: var(--color-google-soft);
+  border-right-color: var(--color-google);
+}
+
 .event-time {
   font-size: 0.8rem;
   color: var(--color-text-muted);
@@ -721,6 +732,11 @@ select {
 
 .event-chip.ev-flexible {
   background: var(--color-accent-soft);
+}
+
+.event-chip.ev-google {
+  background: var(--color-google-soft);
+  box-shadow: inset -3px 0 0 var(--color-google);
 }
 
 /* نموذج جدولة مهمة */
