@@ -135,11 +135,14 @@ describe('enforceTaskEventInvariant — إنفاذ القاعدة على الب�
     await db.open();
   });
 
-  it('ينظف الأشباح ويبني المفقود ولا يلمس الأحداث غير المربوطة (idempotent)', async () => {
+  it('يحذف الأشباح المؤكدة ويبني المفقود ويتركorphan سليمة بلا دليل (idempotent)', async () => {
     // شبح من إنجاز قديم (كما كان يحدث عند الإنجاز من شاشة اليوم)
     const doneTask = await makeTask({ status: 'done', scheduledAt: '2026-01-12T10:00:00.000Z' });
     await makeEvent({ linkedTaskId: doneTask.id });
-    // حدث يتيم لمهمة حُذفت
+    // شبح مؤكد: مهمة مفتوحة بلا موعد
+    const noSchedule = await makeTask();
+    await makeEvent({ linkedTaskId: noSchedule.id, start: '2026-01-12T12:00:00.000Z', end: '2026-01-12T12:30:00.000Z' });
+    // orphan: معرّف لا يشير إلى مهمة (قد يكون legacy سليمًا) ← يُترك
     await makeEvent({ linkedTaskId: 'missing-task' });
     // مهمة مفتوحة مجدولة بلا حدث (كما كان يحدث بعد إعادة فتح قديمة)
     const openTask = await makeTask({ scheduledAt: '2026-01-13T09:00:00.000Z' });
@@ -149,9 +152,12 @@ describe('enforceTaskEventInvariant — إنفاذ القاعدة على الب�
     const first = await enforceTaskEventInvariant();
     expect(first.removed).toBe(2);
     expect(first.rebuilt).toBe(1);
+    expect(first.skipped).toBe(1);
 
     expect(await calendarRepository.getByLinkedTask(doneTask.id)).toHaveLength(0);
-    expect(await calendarRepository.getByLinkedTask('missing-task')).toHaveLength(0);
+    expect(await calendarRepository.getByLinkedTask(noSchedule.id)).toHaveLength(0);
+    // اليتيم يبقى — لا دليل على أنه شبح (بيانات legacy لا تُحذف أعمى)
+    expect(await calendarRepository.getByLinkedTask('missing-task')).toHaveLength(1);
     expect(await calendarRepository.getByLinkedTask(openTask.id)).toHaveLength(1);
     expect(await calendarRepository.get(free.id)).toBeDefined();
 
@@ -159,6 +165,31 @@ describe('enforceTaskEventInvariant — إنفاذ القاعدة على الب�
     const again = await enforceTaskEventInvariant();
     expect(again.removed).toBe(0);
     expect(again.rebuilt).toBe(0);
+    expect(again.skipped).toBe(1);
+  });
+
+  it('موعد تالف: لا يُبنى حدث ولا يُحذف موجود — ويُعدّ skipped بلا خطأ', async () => {
+    const broken = await makeTask({ scheduledAt: 'تاريخ-غير-صالح' });
+    const linked = await makeEvent({ linkedTaskId: broken.id });
+
+    const res = await enforceTaskEventInvariant(); // لا يرمي
+
+    expect(res.rebuilt).toBe(0);
+    expect(res.removed).toBe(0);
+    expect(res.skipped).toBe(1);
+    // الحدث الموجود يبقى كما هو (لا حذف أعمى بسبب سجل تالف)
+    expect(await calendarRepository.get(linked.id)).toBeDefined();
+    expect((await taskRepository.get(broken.id))?.scheduledAt).toBe('تاريخ-غير-صالح');
+  });
+
+  it('إعادة فتح مهمة بموعد تالف لا ترمي ولا تحذف حدثها', async () => {
+    const broken = await makeTask({ status: 'done', scheduledAt: 'تاريخ-غير-صالح' });
+    const linked = await makeEvent({ linkedTaskId: broken.id });
+
+    await expect(reopenTask(broken.id)).resolves.toBeUndefined();
+
+    expect((await taskRepository.get(broken.id))?.status).toBe('todo');
+    expect(await calendarRepository.get(linked.id)).toBeDefined();
   });
 
   it('يصلح المكرر والمنحرف عن الموعد إلى حدث واحد مطابق', async () => {

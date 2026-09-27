@@ -39,8 +39,16 @@ function notify(): void {
 
 // ===== العمليات =====
 
+/** طابع زمني صالح للتخزين — البيانات القديمة أو المعدّلة يدويًا قد تكون تالفة */
+function validISO(value: string | undefined): value is string {
+  if (!value) return false;
+  return Number.isFinite(new Date(value).getTime());
+}
+
 /** استبدال أحداث المهمة المرنة بحدث واحد مشتق من scheduledAt (حذفها إن لا موعد أو كانت منجزة) */
 async function rebuildFlexibleEvent(task: TaskRecord): Promise<void> {
+  // موعد تالف: لا نبني حدثًا ولا نلمس الموجود (لا حذف أعمى بسبب سجل تالف)
+  if (task.scheduledAt && !validISO(task.scheduledAt)) return;
   await calendarRepository.deleteFlexibleByLinkedTask(task.id);
   if (!task.scheduledAt || task.status === 'done') return;
   const start = task.scheduledAt;
@@ -106,13 +114,23 @@ export async function applySchedules(moves: Array<{ taskId: string; startISO: st
   if (moves.length > 0) notify();
 }
 
+/** نتيجة إنفاذ القاعدة: ما حُذف (أشباح مؤكدة)، ما أُعيد بناؤه، وما تُرك بلا دليل */
+export interface InvariantResult {
+  removed: number;
+  rebuilt: number;
+  skipped: number;
+}
+
 /**
- * إنفاذ القاعدة على البيانات القائمة (idempotent — يُستدعى عند كل تحميل للتخطيط):
- *   1) أحداث مرنة مربوطة لمهمة محذوفة/منجزة أو بلا موعد ← أشباح تُحذف.
- *   2) مهمة مفتوحة مجدولة بلا حدث أو بحدَث لا يطابق موعدها ← يُعاد بناؤه.
- * الأحداث المرنة غير المربوطة (من نموذج «حدث جديد») لا تُلمس أبدًا.
+ * إنفاذ القاعدة على البيانات القائمة (idempotent — يُستدعى **مرّة واحدة في الجلسة**):
+ *   1) حدث مرن مربوط بمهمة **منجزة أو بلا موعد** (شبح مؤكد) ← يُحذف.
+ *   2) مهمة **مفتوحة مجدولة** بلا حدث أو بحدث لا يطابق موعدها ← يُعاد بناؤه.
+ * لا يُلمس أبدًا (تُحسب skipped):
+ *   • حدث مربوط بمعرّف لا يشير إلى مهمة (قد يكون بيانات legacy سليمة — لا دليل على أنه شبح).
+ *   • مهمة موعدها تالف (لا نبني ولا نحذف — لا إصلاح أعمى).
+ *   • الأحداث المرنة غير المربوطة (من نموذج «حدث جديد»).
  */
-export async function enforceTaskEventInvariant(): Promise<{ removed: number; rebuilt: number }> {
+export async function enforceTaskEventInvariant(): Promise<InvariantResult> {
   const linkedEvents = (await calendarRepository.getFlexible()).filter((e) => !!e.linkedTaskId);
   const tasks = await taskRepository.getAll();
   const byId = new Map(tasks.map((t) => [t.id, t]));
@@ -127,16 +145,31 @@ export async function enforceTaskEventInvariant(): Promise<{ removed: number; re
 
   let removed = 0;
   let rebuilt = 0;
+  let skipped = 0;
 
   // 1) كل مجموعة أحداث مربوطة تُدقَّق ضد مهمتها
   for (const [taskId, list] of groups) {
     const task = byId.get(taskId);
-    const valid = task && task.status !== 'done' && task.scheduledAt;
-    if (!valid) {
+
+    // (1أ) معرّف لا يشير إلى مهمة ⇒ يُترك (لا دليل على أنه شبح)
+    if (!task) {
+      skipped += list.length;
+      continue;
+    }
+
+    // (1ب) منجزة أو بلا موعد ⇒ شبح مؤكد ⇒ يُحذف
+    if (task.status === 'done' || !task.scheduledAt) {
       await calendarRepository.deleteFlexibleByLinkedTask(taskId);
       removed += list.length;
       continue;
     }
+
+    // (1ج) موعد تالف ⇒ يُترك كما هو (لا نبني ولا نحذف)
+    if (!validISO(task.scheduledAt)) {
+      skipped += list.length;
+      continue;
+    }
+
     const exact = list.filter((e) => e.start === task.scheduledAt);
     if (exact.length !== 1 || list.length !== 1) {
       // مكرر أو انحراف عن الموعد ← إعادة بناء نظيفة واحدة
@@ -146,14 +179,15 @@ export async function enforceTaskEventInvariant(): Promise<{ removed: number; re
     }
   }
 
-  // 2) مهمة مفتوحة مجدولة بلا أي حدث ← يُبنى لها حدثها
+  // 2) مهمة مفتوحة مجدولة (موعدها صالح) بلا أي حدث ← يُبنى لها حدثها
   for (const task of tasks) {
     if (task.status === 'done' || !task.scheduledAt) continue;
+    if (!validISO(task.scheduledAt)) continue;
     if (!groups.has(task.id)) {
       await rebuildFlexibleEvent(task);
       rebuilt += 1;
     }
   }
 
-  return { removed, rebuilt };
+  return { removed, rebuilt, skipped };
 }

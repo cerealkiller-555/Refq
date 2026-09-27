@@ -70,6 +70,13 @@ async function refreshEvents(set: (partial: Partial<PlanningState>) => void) {
   set({ events });
 }
 
+/**
+ * ترحيل القاعدة: يُنفَّذ **مرّة واحدة في الجلسة** عند أول تحميل.
+ * بعدها load قراءة فقط — لا كتابة متكرّرة على كل فتح للشاشة.
+ * (كل الكتابات اللاحقة تمرّ عبر taskLifecycle فتبقى القاعدة صحيحة)
+ */
+let taskInvariantChecked = false;
+
 export const usePlanningStore = create<PlanningState>((set) => ({
   tasks: [],
   events: [],
@@ -78,8 +85,11 @@ export const usePlanningStore = create<PlanningState>((set) => ({
   googleSyncAt: null,
 
   load: async () => {
-    // إنفاذ قاعدة المهمة↔الحدث على البيانات القائمة قبل القراءة (idempotent)
-    await enforceTaskEventInvariant();
+    // ترحيل القاعدة: أول تحميل في الجلسة يصحّح بيانات قديمة، وما بعده قراءة فقط
+    if (!taskInvariantChecked) {
+      taskInvariantChecked = true;
+      await enforceTaskEventInvariant();
+    }
     const [tasks, events, googleEvents] = await Promise.all([
       taskRepository.getAll(),
       calendarRepository.getAll(),
