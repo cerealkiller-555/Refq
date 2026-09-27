@@ -35,6 +35,8 @@ export function MyPlanPage() {
   const [expandedPaths, setExpandedPaths] = useState<Record<string, boolean>>({});
   /** إضافة خطوة جديدة — مسار واحد مفتوح في كل مرة */
   const [itemFormFor, setItemFormFor] = useState<string | null>(null);
+  /** تأكيد حذف مسار — الحذف يمس خطواته فلا يتم بضغطة واحدة */
+  const [confirmDeletePath, setConfirmDeletePath] = useState<string | null>(null);
   /** نموذج مسار جديد */
   const [showAddPath, setShowAddPath] = useState(false);
   const [pathName, setPathName] = useState('');
@@ -321,9 +323,27 @@ export function MyPlanPage() {
                   >
                     {path.status === 'active' ? L.pause : L.activate}
                   </Button>
-                  <Button variant="danger" onClick={() => void deletePath(path.id)}>
-                    {voice.common.delete}
-                  </Button>
+                  {confirmDeletePath === path.id ? (
+                    <>
+                      <span className="text-xs muted">{M.deletePathConfirm}</span>
+                      <Button
+                        variant="danger"
+                        onClick={() => {
+                          setConfirmDeletePath(null);
+                          void deletePath(path.id);
+                        }}
+                      >
+                        {voice.common.delete}
+                      </Button>
+                      <Button variant="ghost" onClick={() => setConfirmDeletePath(null)}>
+                        {voice.common.cancel}
+                      </Button>
+                    </>
+                  ) : (
+                    <Button variant="danger" onClick={() => setConfirmDeletePath(path.id)}>
+                      {voice.common.delete}
+                    </Button>
+                  )}
                 </div>
                 {itemFormFor === path.id && (
                   <ItemForm

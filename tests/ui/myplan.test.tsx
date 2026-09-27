@@ -245,3 +245,33 @@ describe('MyPlanPage UI — تبويب المهام', () => {
   });
 });
 
+describe('MyPlan — تأكيد حذف المسار', () => {
+  it('الضغطة الأولى تسأل، والإلغاء يبقيه، والتأكيد يحذف المسار وخطواته', async () => {
+    const user = userEvent.setup();
+    const p = await learningPathRepository.create(makePath({ title: 'مسار للحذف' }));
+    await pathItemRepository.create(makeItem({ pathId: p.id, title: 'خطوة واحدة', order: 0, status: 'todo' }));
+
+    renderAt();
+    expect(await screen.findByText('مسار للحذف')).toBeDefined();
+
+    // ضغطة واحدة = سؤال، والمسار ما زال موجودًا
+    await user.click(screen.getByRole('button', { name: voice.common.delete }));
+    expect(await screen.findByText(M.deletePathConfirm)).toBeDefined();
+    expect(screen.getByText('مسار للحذف')).toBeDefined();
+
+    // الإلغاء يبقي المسار
+    await user.click(screen.getByRole('button', { name: voice.common.cancel }));
+    await waitFor(() => {
+      expect(screen.queryByText(M.deletePathConfirm)).toBeNull();
+    });
+    expect(screen.getByText('مسار للحذف')).toBeDefined();
+
+    // التأكيد = حذف حقيقي للمسار
+    await user.click(screen.getByRole('button', { name: voice.common.delete }));
+    await user.click(screen.getByRole('button', { name: voice.common.delete }));
+    await waitFor(() => {
+      expect(screen.queryByText('مسار للحذف')).toBeNull();
+    });
+  });
+});
+

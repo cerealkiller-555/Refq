@@ -160,3 +160,42 @@ describe('Planning — المهمة المجدولة تظهر مرة واحدة'
     expect(document.querySelector('.day-summary')?.textContent).toContain('🗓️ 0');
   });
 });
+
+describe('Planning — تأكيد حذف الحدث قبل التنفيذ', () => {
+  it('ضغطة واحدة تسأل، والإلغاء يبقي الحدث، والتأكيد يحذفه', async () => {
+    const user = userEvent.setup();
+    await usePlanningStore.getState().addOccurrence({
+      title: 'محاضرة للحذف',
+      kind: 'fixed',
+      dateKey: todayKey(),
+      time: '14:00',
+      durationMinutes: 60
+    });
+
+    render(<PlanningPage />);
+    await user.click(await screen.findByRole('tab', { name: cal.tabs.day }));
+
+    // الضغطة الأولى سؤال فقط — والحدث ما زال موجودًا
+    const row = (await screen.findByText('محاضرة للحذف')).closest('li') as HTMLElement;
+    await user.click(within(row).getByLabelText(voice.common.delete));
+    expect(await screen.findByText(cal.deleteEventConfirm)).toBeDefined();
+    expect(screen.getByText('محاضرة للحذف')).toBeDefined();
+
+    // الإلغاء يبقيه
+    const rowCancel = (await screen.findByText('محاضرة للحذف')).closest('li') as HTMLElement;
+    await user.click(within(rowCancel).getByLabelText(voice.common.cancel));
+    await waitFor(() => {
+      expect(screen.queryByText(cal.deleteEventConfirm)).toBeNull();
+    });
+    expect(screen.getByText('محاضرة للحذف')).toBeDefined();
+
+    // التأكيد = حذف حقيقي
+    const rowAgain = (screen.getByText('محاضرة للحذف').closest('li')) as HTMLElement;
+    await user.click(within(rowAgain).getByLabelText(voice.common.delete));
+    await user.click(within(rowAgain).getByLabelText(voice.common.delete));
+    await waitFor(() => {
+      expect(screen.queryByText('محاضرة للحذف')).toBeNull();
+    });
+    expect(usePlanningStore.getState().events).toHaveLength(0);
+  });
+});

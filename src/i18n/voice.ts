@@ -125,7 +125,8 @@ export const voice = {
         applied: 'تمت إعادة التوزيع 🤍 مفيش ضغط، والثوابت ما اتحركتش أبدًا.',
         dismiss: 'شكرًا، دلوقتي كفاية'
       },
-      scheduledChip: 'مجدولة'
+      scheduledChip: 'مجدولة',
+      deleteEventConfirm: 'حذفه نهائيًا؟'
     }
   },
   heart: {
@@ -232,6 +233,7 @@ export const voice = {
     inProgressIndicator: 'شغّالة عليها الآن ⏳',
     allDone: 'أتممتِ كل خطوات هذه المادة بارك الله فيكِ 🌸',
     sessionsTotal: '{count} جلسات مسجلة',
+    deletePathConfirm: 'حذف المسار وكل خطواته نهائيًا؟',
     durationChip: '{minutes} د',
     expandItems: 'عرض كل الخطوات',
     collapseItems: 'طي الخطوات',

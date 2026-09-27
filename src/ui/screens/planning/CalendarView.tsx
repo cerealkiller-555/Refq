@@ -70,15 +70,40 @@ function ownLocalEvents(events: CalendarEvent[]): CalendarEvent[] {
 
 function EventRow({ occ, onDelete }: { occ: OccLike; onDelete?: (id: string) => void }) {
   const isGoogle = occ.event.source === 'google';
+  // الحذف غير قابل للتراجع ← سؤال أولًا ثم تأكيد (نفس نمط «حذف كل البيانات»)
+  const [confirming, setConfirming] = useState(false);
+  const canDelete = Boolean(onDelete) && !isGoogle;
   return (
-    <li className={occClass(occ)}>
+    <li className={`${occClass(occ)}${confirming ? ' is-confirming' : ''}`}>
       <span className="event-time">{occ.event.allDay ? cal.allDayLabel : formatEventTime(occ.start, occ.end)}</span>
       <span className="event-title">{occ.event.title}</span>
       <span className="event-kind">{isGoogle ? cal.googleLabel : cal.kindLabels[occ.event.kind]}</span>
-      {onDelete && !isGoogle && (
-        <button className="task-delete" aria-label={voice.common.delete} onClick={() => onDelete(occ.event.id)}>
+      {canDelete && !confirming && (
+        <button className="task-delete" aria-label={voice.common.delete} onClick={() => setConfirming(true)}>
           ×
         </button>
+      )}
+      {canDelete && confirming && (
+        <span className="event-confirm">
+          <span className="text-xs muted">{cal.deleteEventConfirm}</span>
+          <button
+            className="task-delete"
+            aria-label={voice.common.delete}
+            onClick={() => {
+              setConfirming(false);
+              onDelete?.(occ.event.id);
+            }}
+          >
+            ✓
+          </button>
+          <button
+            className="task-delete"
+            aria-label={voice.common.cancel}
+            onClick={() => setConfirming(false)}
+          >
+            ×
+          </button>
+        </span>
       )}
     </li>
   );
