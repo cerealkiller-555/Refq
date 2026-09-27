@@ -170,3 +170,50 @@ describe('Planning Store P2', () => {
     expect(plan.moved.some((m) => m.taskId && m.taskId.startsWith('prayer'))).toBe(false);
   });
 });
+
+describe('Planning Store — دورة الحياة الموحّدة (أحداث ↔ مهام)', () => {
+  beforeEach(async () => {
+    await db.delete();
+    await db.open();
+    usePlanningStore.setState({ tasks: [], events: [], replanResult: null });
+  });
+
+  async function makeTask(partial: Partial<TaskRecord> = {}): Promise<TaskRecord> {
+    return taskRepository.create({
+      title: 'مهمة',
+      importance: 'low',
+      urgency: 'low',
+      estimatedDuration: 60,
+      status: 'todo',
+      ...partial
+    } as unknown as Parameters<typeof taskRepository.create>[0]);
+  }
+
+  it('إعادة فتح مهمة تستعيد حدثها المرن بمواعدها (ليست شارة بلا حدث)', async () => {
+    const task = await makeTask();
+    await usePlanningStore.getState().scheduleTask(task.id, '2026-01-12', '10:00');
+    await usePlanningStore.getState().markTaskDone(task.id);
+    expect(await calendarRepository.getByLinkedTask(task.id)).toHaveLength(0);
+
+    await usePlanningStore.getState().reopenTask(task.id);
+
+    const linked = await calendarRepository.getByLinkedTask(task.id);
+    expect(linked).toHaveLength(1);
+    expect(new Date(linked[0].start).getHours()).toBe(10);
+    expect((await taskRepository.get(task.id))?.status).toBe('todo');
+    expect(usePlanningStore.getState().tasks.find((t) => t.id === task.id)?.scheduledAt).toBeTruthy();
+  });
+
+  it('حذف حدث مربوق يفكّ جدولة المهمة أيضًا (لا شارة «مجدولة» بلا حدث)', async () => {
+    const task = await makeTask();
+    await usePlanningStore.getState().scheduleTask(task.id, '2026-01-12', '10:00');
+    const linked = await calendarRepository.getByLinkedTask(task.id);
+    expect(linked).toHaveLength(1);
+
+    await usePlanningStore.getState().deleteEvent(linked[0].id);
+
+    expect(await calendarRepository.get(linked[0].id)).toBeUndefined();
+    expect((await taskRepository.get(task.id))?.scheduledAt).toBeUndefined();
+    expect(usePlanningStore.getState().tasks.find((t) => t.id === task.id)?.scheduledAt).toBeUndefined();
+  });
+});

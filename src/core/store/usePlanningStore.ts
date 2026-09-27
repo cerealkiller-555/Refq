@@ -13,6 +13,17 @@ import {
 import { recomputePlan, type RecoveryPlan } from '../engines/recoveryEngine';
 import { localDateTimeISO } from '../engines/calendarEngine';
 import { syncWithStoredToken, disconnectGoogleCalendar } from '../integrations/googleCalendar';
+import {
+  completeTask as completeTaskLifecycle,
+  reopenTask as reopenTaskLifecycle,
+  deleteTask as deleteTaskLifecycle,
+  updateTask as updateTaskLifecycle,
+  applySchedule,
+  applySchedules,
+  enforceTaskEventInvariant,
+  onTaskLifecycleChange
+} from '../services/taskLifecycle';
+import { useActiveTaskStore } from './useActiveTaskStore';
 import type { TaskRecord, CalendarEvent, CalendarEventKind } from '../types';
 
 interface NewEventData {
@@ -67,6 +78,8 @@ export const usePlanningStore = create<PlanningState>((set) => ({
   googleSyncAt: null,
 
   load: async () => {
+    // إنفاذ قاعدة المهمة↔الحدث على البيانات القائمة قبل القراءة (idempotent)
+    await enforceTaskEventInvariant();
     const [tasks, events, googleEvents] = await Promise.all([
       taskRepository.getAll(),
       calendarRepository.getAll(),
@@ -81,10 +94,20 @@ export const usePlanningStore = create<PlanningState>((set) => ({
     set({ tasks });
   },
 
-  /** إتمام مهمة — وأحداثها المرنة المربوطة تتحرر بلطف */
+  /** إتمام مهمة — عبر مسار واحد لكل الشاشات: أحداثها المرنة تتحرر بلطف */
   markTaskDone: async (id) => {
-    await taskRepository.markDone(id);
-    await calendarRepository.deleteFlexibleByLinkedTask(id);
+    await completeTaskLifecycle(id);
+    const [tasks, events] = await Promise.all([
+      taskRepository.getAll(),
+      calendarRepository.getAll()
+    ]);
+    set({ tasks, events });
+    await useActiveTaskStore.getState().load();
+  },
+
+  /** إعادة فتح — يُعاد بناء حدثها المرن من موعدها (لا شارة بلا حدث) */
+  reopenTask: async (id) => {
+    await reopenTaskLifecycle(id);
     const [tasks, events] = await Promise.all([
       taskRepository.getAll(),
       calendarRepository.getAll()
@@ -92,16 +115,14 @@ export const usePlanningStore = create<PlanningState>((set) => ({
     set({ tasks, events });
   },
 
-  reopenTask: async (id) => {
-    await taskRepository.update(id, { status: 'todo' });
-    const tasks = await taskRepository.getAll();
-    set({ tasks });
-  },
-
   updateTask: async (id, changes) => {
-    await taskRepository.update(id, changes);
-    const tasks = await taskRepository.getAll();
-    set({ tasks });
+    await updateTaskLifecycle(id, changes);
+    const [tasks, events] = await Promise.all([
+      taskRepository.getAll(),
+      calendarRepository.getAll()
+    ]);
+    set({ tasks, events });
+    await useActiveTaskStore.getState().load();
   },
 
   addEvent: async (event) => {
@@ -129,37 +150,34 @@ export const usePlanningStore = create<PlanningState>((set) => ({
   },
 
   deleteEvent: async (id) => {
+    const event = await calendarRepository.get(id);
     await calendarRepository.delete(id);
-    await refreshEvents(set);
-  },
-
-  deleteTask: async (id) => {
-    await taskRepository.delete(id);
-    // أحداثها المرنة المربوطة لم تعد لها معنى
-    await calendarRepository.deleteFlexibleByLinkedTask(id);
-    const tasks = await taskRepository.getAll();
-    const events = await calendarRepository.getAll();
+    // حدث مربوط بمهمة ← حذفه يفكّ جدولة المهمة كذلك (لا تبقى شارة «مجدولة» بلا حدث)
+    if (event?.linkedTaskId) {
+      await taskRepository.update(event.linkedTaskId, { scheduledAt: undefined });
+    }
+    const [tasks, events] = await Promise.all([
+      taskRepository.getAll(),
+      calendarRepository.getAll()
+    ]);
     set({ tasks, events });
   },
 
-  /** جدولة مهمة: scheduledAt + حدث مرن مربوط (يستبدل السابق إن وجد) */
+  deleteTask: async (id) => {
+    await deleteTaskLifecycle(id);
+    const [tasks, events] = await Promise.all([
+      taskRepository.getAll(),
+      calendarRepository.getAll()
+    ]);
+    set({ tasks, events });
+    await useActiveTaskStore.getState().load();
+  },
+
+  /** جدولة مهمة: scheduledAt + حدث مرن مربوط (يستبدل السابق إن وجد) — عبر المسار الموحّد */
   scheduleTask: async (taskId, dayKey, time) => {
     const task = await taskRepository.get(taskId);
     if (!task) return;
-    const start = localDateTimeISO(dayKey, time);
-    const duration = task.estimatedDuration || 30;
-    const end = new Date(new Date(start).getTime() + duration * 60000).toISOString();
-
-    await calendarRepository.deleteFlexibleByLinkedTask(taskId);
-    await calendarRepository.create({
-      title: task.title,
-      kind: 'flexible',
-      start,
-      end,
-      linkedTaskId: taskId
-    } as unknown as CalendarEvent);
-    await taskRepository.setScheduled(taskId, start);
-
+    await applySchedule(taskId, localDateTimeISO(dayKey, time));
     const [tasks, events] = await Promise.all([
       taskRepository.getAll(),
       calendarRepository.getAll()
@@ -198,21 +216,8 @@ export const usePlanningStore = create<PlanningState>((set) => ({
       maxMinutesPerDay: 360
     });
 
-    for (const move of plan.moved) {
-      await taskRepository.setScheduled(move.taskId, move.scheduledAt);
-      await calendarRepository.deleteFlexibleByLinkedTask(move.taskId);
-      const task = await taskRepository.get(move.taskId);
-      const end = new Date(
-        new Date(move.scheduledAt).getTime() + (task?.estimatedDuration || 30) * 60000
-      ).toISOString();
-      await calendarRepository.create({
-        title: task?.title ?? 'مهمة',
-        kind: 'flexible',
-        start: move.scheduledAt,
-        end,
-        linkedTaskId: move.taskId
-      } as unknown as CalendarEvent);
-    }
+    // دفعة واحدة عبر المسار الموحّد — إشعار واحد بعد الكل
+    await applySchedules(plan.moved.map((m) => ({ taskId: m.taskId, startISO: m.scheduledAt })));
 
     const [tasks, events] = await Promise.all([
       taskRepository.getAll(),
@@ -227,3 +232,16 @@ export const usePlanningStore = create<PlanningState>((set) => ({
 
 // مساعد اليوم المحلي — يُصدَّر من هنا للـUI (المصدر في calendarEngine)
 export { todayKey } from '../engines/calendarEngine';
+
+// أي تغيّر في دورة حياة المهمة من شاشة أخرى ← إعادة قراءة المهام والأحداث هنا (قراءات فقط)
+onTaskLifecycleChange(() => {
+  void (async () => {
+    const [tasks, events] = await Promise.all([
+      taskRepository.getAll(),
+      calendarRepository.getAll()
+    ]);
+    usePlanningStore.setState({ tasks, events });
+  })().catch(() => {
+    // قاعدة مغلقة أثناء الإيقاف — التحميل القادم يصحح
+  });
+});

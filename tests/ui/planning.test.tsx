@@ -142,3 +142,21 @@ describe('Planning Calendar UI', () => {
     expect(screen.getAllByText('حدث الأسبوع').length).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe('Planning — المهمة المجدولة تظهر مرة واحدة', () => {
+  it('مهمة مجدولة: شريحة المهام ولا صف أحداث مكرر (الحدث انعكاس مخفي)', async () => {
+    const user = userEvent.setup();
+    await makeTask({ title: 'موعد المكتبة', scheduledAt: localDateTimeISO(todayKey(), '11:00') });
+    await usePlanningStore.getState().load(); // enforce يبني حدث الانعكاس
+
+    render(<PlanningPage />);
+    await user.click(await screen.findByRole('tab', { name: cal.tabs.day }));
+
+    expect(await screen.findByText('موعد المكتبة')).toBeDefined();
+    // مرة واحدة فقط — لا تكرار بين شريحة المهام وصف الأحداث
+    expect(screen.getAllByText('موعد المكتبة')).toHaveLength(1);
+    expect(document.querySelector('.task-chip')).not.toBeNull();
+    // الملخص: مهمة واحدة · صفر أحداث (انعكاس المهمة لا يُعدّ حدثًا)
+    expect(document.querySelector('.day-summary')?.textContent).toContain('🗓️ 0');
+  });
+});

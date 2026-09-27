@@ -9,6 +9,7 @@
 
 import { create } from 'zustand';
 import { pathItemRepository, sessionRepository, taskRepository } from '../db/repositories';
+import { completeTask as completeTaskLifecycle, onTaskLifecycleChange } from '../services/taskLifecycle';
 
 type ActiveKind = 'task' | 'learning';
 
@@ -199,7 +200,8 @@ export const useActiveTaskStore = create<ActiveTaskState>((set, get) => {
         if (active.kind === 'learning') {
           await pathItemRepository.update(active.id, { status: 'done' });
         } else {
-          await taskRepository.complete(active.id);
+          // مسار دورة الحياة الموحّد — يحرّر أحداث المهمة المرنة مثل أي شاشة أخرى
+          await completeTaskLifecycle(active.id);
         }
       } catch {
         // فشل الإنجاز ← يبقى الشريط كما هو
@@ -254,4 +256,11 @@ export const useActiveTaskStore = create<ActiveTaskState>((set, get) => {
       get().clearTimer();
     }
   };
+});
+
+// دورة حياة واحدة: أي إنجاز/حذف/تعديل من أي شاشة يُحدّث المهمة الجارية (قراءات فقط)
+onTaskLifecycleChange(() => {
+  void useActiveTaskStore.getState().load().catch(() => {
+    // قاعدة مغلقة أثناء الإيقاف — التحميل القادم يصحح
+  });
 });

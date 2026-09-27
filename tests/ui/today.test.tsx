@@ -13,12 +13,14 @@ import { render, screen, waitFor, cleanup, act, within } from '@testing-library/
 import userEvent from '@testing-library/user-event';
 import { TodayPage } from '../../src/ui/screens/today/TodayPage';
 import { useTodayStore } from '../../src/core/store/useTodayStore';
-import { taskRepository, prayerAnchorRepository } from '../../src/core/db/repositories';
+import { taskRepository, calendarRepository, prayerAnchorRepository } from '../../src/core/db/repositories';
 import { db } from '../../src/core/db/schema';
 import type { TaskRecord, PrayerAnchor } from '../../src/core/types';
 import { voice } from '../../src/i18n/voice';
 import { localDateKey } from '../../src/utils';
 import { getCurrentPeriod } from '../../src/core/engines/dayPeriods';
+import { localDateTimeISO } from '../../src/core/engines/calendarEngine';
+import { applySchedule } from '../../src/core/services/taskLifecycle';
 
 const initialTodayState = {
   tasks: [] as TaskRecord[],
@@ -196,5 +198,39 @@ describe('TodayPage — فترات الصلاة (P3)', () => {
     await waitFor(() => {
       expect(useTodayStore.getState().currentPeriod?.period.anchor).toBe('asr');
     });
+  });
+});
+
+describe('Today — إنجاز المهمة يحرّر أحداثها (مسار دورة الحياة الموحّد)', () => {
+  beforeEach(async () => {
+    await db.delete();
+    await db.open();
+    useTodayStore.setState(initialTodayState);
+  });
+
+  afterEach(() => cleanup());
+
+  it('إنجاز مهمة مجدولة من شاشة اليوم يزيل حدثها المرن من التقويم', async () => {
+    const task = await taskRepository.create({
+      title: 'مهمة مجدولة اليوم',
+      importance: 'low',
+      urgency: 'low',
+      estimatedDuration: 30,
+      status: 'todo'
+    } as Parameters<typeof taskRepository.create>[0]);
+    await applySchedule(task.id, localDateTimeISO(localDateKey(), '10:00'));
+    expect(await calendarRepository.getByLinkedTask(task.id)).toHaveLength(1);
+
+    render(<TodayPage />);
+
+    // العنوان قد يظهر في «أهم الأولويات» و«مهام اليوم» — نضغط إنجاز على أول صف
+    const rows = await screen.findAllByText('مهمة مجدولة اليوم');
+    const row = rows[0].closest('li') as HTMLElement;
+    await userEvent.click(within(row).getByLabelText(voice.common.complete));
+
+    await waitFor(async () => {
+      expect(await calendarRepository.getByLinkedTask(task.id)).toHaveLength(0);
+    });
+    expect((await taskRepository.get(task.id))?.status).toBe('done');
   });
 });

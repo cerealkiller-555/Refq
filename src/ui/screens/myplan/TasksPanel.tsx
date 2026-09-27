@@ -72,7 +72,8 @@ export function TasksPanel() {
     [tasks, weekDaySet]
   );
   const weekEvents = useMemo(() => {
-    const byDay = eventsForWeek(events, weekStart);
+    // الأحداث المرنة المربوطة انعكاسات مهام تُعدّ في weekTasks — لا عدّ مزدوج
+    const byDay = eventsForWeek(events.filter((e) => !e.linkedTaskId), weekStart);
     const seen = new Set<string>();
     for (const list of byDay.values()) for (const occ of list) seen.add(`${occ.event.id}-${occ.start}`);
     return seen.size;

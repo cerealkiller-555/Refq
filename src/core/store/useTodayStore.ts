@@ -13,6 +13,13 @@ import {
   taskRepository
 } from '../db/repositories';
 import type { TaskRecord, EnergyLevel, PrayerAnchor } from '../types';
+import {
+  completeTask as completeTaskLifecycle,
+  deleteTask as deleteTaskLifecycle,
+  updateTask as updateTaskLifecycle,
+  onTaskLifecycleChange
+} from '../services/taskLifecycle';
+import { useActiveTaskStore } from './useActiveTaskStore';
 import { getTopPriorities } from '../engines/priorityEngine';
 import { suggestTask, type SuggestionResult, type Suggestable } from '../engines/suggestionEngine';
 import { nextSteps } from '../engines/learningEngine';
@@ -38,6 +45,8 @@ interface TodayState {
   deleteTask: (id: string) => Promise<void>;
   updateTask: (id: string, changes: Partial<TaskRecord>) => Promise<void>;
   clearSuggestion: () => void;
+  /** إعادة قراءة المهام والأولويات — يدويًا أو عند تغيّر دورة المهمة من أي شاشة */
+  refresh: () => Promise<void>;
   syncPrayerAnchors: () => Promise<void>;
 }
 
@@ -175,22 +184,35 @@ export const useTodayStore = create<TodayState>((set, get) => {
     },
 
     completeTask: async (id) => {
-      await taskRepository.complete(id);
+      // مسار دورة الحياة الموحّد — يحرّر أحداثها المرنة في التقويم أيضًا (لا أشباح)
+      await completeTaskLifecycle(id);
       set({ suggestion: null });
       await refresh();
+      await useActiveTaskStore.getState().load(); // الشريط قد يعرض هذه المهمة
     },
 
     deleteTask: async (id) => {
-      await taskRepository.delete(id);
+      await deleteTaskLifecycle(id);
       set({ suggestion: null });
       await refresh();
+      await useActiveTaskStore.getState().load();
     },
 
     updateTask: async (id, changes) => {
-      await taskRepository.update(id, changes);
+      await updateTaskLifecycle(id, changes);
       await refresh();
+      await useActiveTaskStore.getState().load(); // عنوان المهمة الجارية قد تغيّر
     },
+
+    refresh,
 
     clearSuggestion: () => set({ suggestion: null })
   };
+});
+
+// أي تغيّر في دورة حياة المهمة من شاشة أخرى ← تحديث قوائم اليوم وأولوياتها (قراءات فقط)
+onTaskLifecycleChange(() => {
+  void useTodayStore.getState().refresh().catch(() => {
+    // قاعدة مغلقة أثناء الإيقاف — التحميل القادم يصحح
+  });
 });

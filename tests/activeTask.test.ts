@@ -10,8 +10,10 @@ import {
   taskRepository,
   pathItemRepository,
   learningPathRepository,
-  sessionRepository
+  sessionRepository,
+  calendarRepository
 } from '../src/core/db/repositories';
+import { applySchedule } from '../src/core/services/taskLifecycle';
 import { useActiveTaskStore, remainingMs } from '../src/core/store/useActiveTaskStore';
 import type { ActiveTimer } from '../src/core/store/useActiveTaskStore';
 
@@ -243,4 +245,26 @@ describe('Active Task Store', () => {
     expect(st.pending).toBeNull();
     expect(st.timer).toBeNull();
   });
+
+describe('Active Task — تحرير أحداث المهمة عند الإنجاز (المسار الموحّد)', () => {
+  beforeEach(async () => {
+    await db.delete();
+    await db.open();
+    resetStore();
+  });
+
+  it('completeActive تنهي مهمة مجدولة وتُزيل حدثها المرن (لا شبح في التقويم)', async () => {
+    const id = await seedTask('مجدولة للشريط');
+    await applySchedule(id, '2026-01-12T15:00:00.000Z');
+    expect(await calendarRepository.getByLinkedTask(id)).toHaveLength(1);
+
+    await useActiveTaskStore.getState().startItem(id, 'task', 'مجدولة للشريط', 30);
+    await useActiveTaskStore.getState().completeActive();
+
+    expect((await taskRepository.get(id))?.status).toBe('done');
+    expect(await calendarRepository.getByLinkedTask(id)).toHaveLength(0);
+    expect(useActiveTaskStore.getState().active).toBeNull();
+  });
+});
+
 });

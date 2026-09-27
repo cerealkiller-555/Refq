@@ -21,7 +21,7 @@ import {
   monthGridKeys,
   mergeEventSources
 } from '../../../core/engines/calendarEngine';
-import type { CalendarEventKind } from '../../../core/types';
+import type { CalendarEvent, CalendarEventKind } from '../../../core/types';
 import { voice } from '../../../i18n/voice';
 import { Button, Card, EmptyState } from '../../components';
 
@@ -58,6 +58,14 @@ interface OccLike {
 /** صف_class الحدث — أحداث جوجل تُعلَّم بلون مختلف وتُعرض بلا زر حذف (قراءة فقط) */
 function occClass(occ: OccLike): string {
   return `event-row ${KIND_CLASS[occ.event.kind]}${occ.event.source === 'google' ? ' ev-google' : ''}`;
+}
+
+/**
+ * الأحداث المحلية «المملوكة» — الأحداث المرنة المربوطة بمهمة انعكاسات لها،
+ * تمثّلها شريحة المهام في العرض (لا تكرار ولا عدّ مزدوج في التقويم).
+ */
+function ownLocalEvents(events: CalendarEvent[]): CalendarEvent[] {
+  return events.filter((e) => !e.linkedTaskId);
 }
 
 function EventRow({ occ, onDelete }: { occ: OccLike; onDelete?: (id: string) => void }) {
@@ -141,7 +149,7 @@ function DayView({ dayKeyStr, onOpenDay }: { dayKeyStr: string; onOpenDay: (key:
   const [showForm, setShowForm] = useState(false);
 
   const dayEvents = useMemo(
-    () => eventsForDay(mergeEventSources(events, googleEvents), dayKeyStr),
+    () => eventsForDay(mergeEventSources(ownLocalEvents(events), googleEvents), dayKeyStr),
     [events, googleEvents, dayKeyStr]
   );
   const dayTasks = useMemo(() => groupTasksByDay(tasks).get(dayKeyStr) ?? [], [tasks, dayKeyStr]);
@@ -208,7 +216,7 @@ function WeekView({ anchorKey, onOpenDay }: { anchorKey: string; onOpenDay: (key
 
   const start = weekStartKey(anchorKey);
   const days = useMemo(() => weekDayKeys(start), [start]);
-  const allEvents = useMemo(() => mergeEventSources(events, googleEvents), [events, googleEvents]);
+  const allEvents = useMemo(() => mergeEventSources(ownLocalEvents(events), googleEvents), [events, googleEvents]);
   const byDay = useMemo(() => eventsForWeek(allEvents, start), [allEvents, start]);
   const tasksByDay = useMemo(() => groupTasksByDay(tasks), [tasks]);
 
@@ -273,7 +281,7 @@ function MonthView({ anchorKey, onOpenDay }: { anchorKey: string; onOpenDay: (ke
   const tasks = usePlanningStore((s) => s.tasks);
 
   const keys = useMemo(() => monthGridKeys(anchorKey), [anchorKey]);
-  const allEvents = useMemo(() => mergeEventSources(events, googleEvents), [events, googleEvents]);
+  const allEvents = useMemo(() => mergeEventSources(ownLocalEvents(events), googleEvents), [events, googleEvents]);
   const byDay = useMemo(() => eventsForMonth(allEvents, anchorKey), [allEvents, anchorKey]);
   const tasksByDay = useMemo(() => groupTasksByDay(tasks), [tasks]);
 
