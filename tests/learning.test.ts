@@ -39,15 +39,16 @@ function makePath(over: Partial<LearningPath> = {}): LearningPath {
 }
 
 function makeItem(over: Partial<PathItem> & { pathId: string }): PathItem {
-  const { pathId, ...rest } = over;
+  const { pathId: pid, ...rest } = over;
   return {
     id: rest.id ?? `item-${Math.random().toString(36).slice(2, 8)}`,
-    pathId,
     title: rest.title ?? 'محاضرة 1',
     order: rest.order ?? 0,
     status: rest.status ?? 'todo',
     estimatedDuration: rest.estimatedDuration ?? 20,
-    ...ts
+    ...ts,
+    ...rest,
+    pathId: pid
   };
 }
 
@@ -117,13 +118,53 @@ describe('learningEngine', () => {
     expect(pathProgress(items)).toEqual({ done: 2, total: 3 });
   });
 
-  it('pathItemToSuggestable يحمل نوع learning واسم المسار', () => {
+  it('pathItemToSuggestable يحمل نوع learning واسم المسار والموعد', () => {
     const path = makePath({ title: 'كورس التفسير' });
-    const item = makeItem({ pathId: path.id, estimatedDuration: 30 });
+    const item = makeItem({ pathId: path.id, estimatedDuration: 30, deadline: '2026-02-01T12:00:00.000Z' });
     const s = pathItemToSuggestable(item, path.title);
     expect(isLearningItem(s)).toBe(true);
     expect(s.sourceLabel).toBe('كورس التفسير');
     expect(s.estimatedDuration).toBe(30);
+    // الموعد ينتقل فعلًا إلى Suggestable ليستخدمه نظام الأولوية الموجود
+    expect(s.deadline).toBe('2026-02-01T12:00:00.000Z');
+  });
+
+  it('deadline يدخل ترتيب الخطوات: المتأخرة أولًا ثم الأقرب، وبلا deadline تبقى صالحة', () => {
+    const now = '2026-01-10T10:00:00.000Z';
+    const overdue = makePath({ id: 'p-overdue', order: 0 });
+    const near = makePath({ id: 'p-near', order: 1 });
+    const far = makePath({ id: 'p-far', order: 2 });
+    const plain = makePath({ id: 'p-plain', order: 3 });
+    const steps = nextSteps(
+      [far, plain, near, overdue],
+      {
+        [overdue.id]: [makeItem({ pathId: overdue.id, id: 'i-overdue', deadline: '2026-01-08T10:00:00.000Z' })],
+        [near.id]: [makeItem({ pathId: near.id, id: 'i-near', deadline: '2026-01-11T10:00:00.000Z' })],
+        [far.id]: [makeItem({ pathId: far.id, id: 'i-far', deadline: '2026-01-20T10:00:00.000Z' })],
+        [plain.id]: [makeItem({ pathId: plain.id, id: 'i-plain' })]
+      },
+      now
+    );
+    expect(steps.map((s) => s.item.id)).toEqual(['i-overdue', 'i-near', 'i-far', 'i-plain']);
+  });
+
+  it('عند تساوي الموعد يتقدم ترتيب المسار، والمُنجزة مستبعدة دائمًا', () => {
+    const now = '2026-01-10T10:00:00.000Z';
+    const first = makePath({ id: 'p-first', order: 0 });
+    const second = makePath({ id: 'p-second', order: 1 });
+    const steps = nextSteps(
+      [second, first],
+      {
+        [first.id]: [makeItem({ pathId: first.id, id: 'i-first', deadline: '2026-01-12T10:00:00.000Z' })],
+        [second.id]: [
+          makeItem({ pathId: second.id, id: 'i-done', order: 0, status: 'done', deadline: '2026-01-09T10:00:00.000Z' }),
+          makeItem({ pathId: second.id, id: 'i-second', order: 1, deadline: '2026-01-12T10:00:00.000Z' })
+        ]
+      },
+      now
+    );
+    // نفس درجة الموعد → ترتيب المسار يحسم، والمُنجزة لا تظهر أبدًا
+    expect(steps.map((s) => s.item.id)).toEqual(['i-first', 'i-second']);
   });
 });
 

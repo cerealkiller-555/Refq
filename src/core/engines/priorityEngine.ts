@@ -34,7 +34,8 @@ export function computePriorityScore(
 
   if (task.deadline) {
     const daysLeft = (new Date(task.deadline).getTime() - new Date(now).getTime()) / (1000 * 60 * 60 * 24);
-    if (daysLeft >= 0 && daysLeft <= 1) score += 3;
+    if (daysLeft < 0) score += 4; // متأخرة عن موعدها
+    else if (daysLeft <= 1) score += 3;
     else if (daysLeft <= 3) score += 2;
     else if (daysLeft <= 7) score += 1;
   }
@@ -48,7 +49,8 @@ export function describeTaskFactors(task: TaskRecord, now: string): string[] {
   const parts: string[] = [];
   if (task.deadline) {
     const daysLeft = (new Date(task.deadline).getTime() - new Date(now).getTime()) / (1000 * 60 * 60 * 24);
-    if (daysLeft >= 0 && daysLeft <= 1) parts.push('الموعد غدًا');
+    if (daysLeft < 0) parts.push('متأخرة عن موعدها');
+    else if (daysLeft <= 1) parts.push('الموعد غدًا');
     else if (daysLeft <= 3) parts.push('الموعد قريب');
     else if (daysLeft <= 7) parts.push('الموعد هذا الأسبوع');
   }

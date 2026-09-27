@@ -77,6 +77,7 @@ export function pathItemToSuggestable(item: PathItem, pathTitle: string): Sugges
     estimatedDuration: item.estimatedDuration,
     status: item.status,
     energyRequired: item.energyRequired,
+    deadline: item.deadline,
     sourceLabel: pathTitle,
     kind: 'learning'
   };

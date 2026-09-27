@@ -1,22 +1,18 @@
 // ============================================================
-// رِفق — Screen: خطتي (MyPlan) — صفحة موحّدة بلا تبويبات
-// الترتيب: لمحة المهام ولافتة التعافي ← بطاقات المواد وخطواتها
-// (مع الموعد النهائي، وتحرير/حذف الخطوة من صفها) ← قسم «مهام مباشرة».
-// ?tab=tasks بقي مقروءًا كتوافق خلفي مؤقت (زر «كل المهام» في اليوم)
-// فيمرّر بلطف إلى قسم المهام بدل تبديل تبويب.
-// أدوات الإدارة موروثة من شاشة «رحلتي»: مسار جديد، إضافة خطوة،
-// إيقاف مؤقت/استئناف، وحذف — بلا أي ضغط، خطوة واحدة تكفي.
+// رِفق — Screen: خطتي (MyPlan)
+// مسارات التعلّم والمواد الدراسية: المسار الأساسي الوحيد للمهام والخطوات:
+// Learning Path → PathItem → Session.
+// أدوات الإدارة: مسار جديد، إضافة خطوة، إيقاف مؤقت/استئناف،
+// وحذف — بلا أي ضغط، خطوة واحدة تكفي.
 // ============================================================
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { useLearningStore } from '../../../core/store/useLearningStore';
 import { useActiveTaskStore } from '../../../core/store/useActiveTaskStore';
 import { nextSteps, pathProgress } from '../../../core/engines/learningEngine';
 import { dateKey, todayKey } from '../../../core/engines/calendarEngine';
 import { voice } from '../../../i18n/voice';
 import { Card, Button, Chip, EmptyState } from '../../components';
-import { TasksPanel, TasksGlance } from './TasksPanel';
 import type { LearningPath, LearningPathType, PathItem, Session } from '../../../core/types';
 
 const M = voice.myPlan;
@@ -69,23 +65,9 @@ export function MyPlanPage() {
   const [pathName, setPathName] = useState('');
   const [pathType, setPathType] = useState<LearningPathType>('university');
 
-  // توافق خلفي مؤقت: زر «كل المهام» في اليوم كان يستخدم ?tab=tasks —
-  // نقرؤه ونمرّر مرة واحدة إلى قسم المهام، بلا تبويبات وبلا إعادة كتابة للرابط.
-  const [searchParams] = useSearchParams();
-  const legacyTasksLink = searchParams.get('tab') === 'tasks';
-
   useEffect(() => {
     void load();
   }, [load]);
-
-  useEffect(() => {
-    if (!legacyTasksLink) return;
-    // بعد أول رسم فقط — مرة واحدة، وبلا أي تأثير على التنقل العادي
-    const t = setTimeout(() => {
-      document.getElementById('direct-tasks')?.scrollIntoView?.({ block: 'start' });
-    }, 0);
-    return () => clearTimeout(t);
-  }, [legacyTasksLink]);
 
   const globalNextSteps = useMemo(() => {
     return nextSteps(paths, itemsByPath);
@@ -178,10 +160,7 @@ export function MyPlanPage() {
         <p className="screen-subtitle muted">{M.subtitle}</p>
       </header>
 
-      {/* ١) لمحة المهام + لافتة اليوم الفائت — أعلى الصفحة قبل بطاقات المواد */}
-      <TasksGlance />
-
-      {/* ٢) بطاقات المواد/المسارات وخطواتها */}
+      {/* بطاقات المواد/المسارات وخطواتها */}
       {paths.length === 0 ? (
         <Card>
           <EmptyState icon="📚">{M.empty}</EmptyState>
@@ -509,11 +488,6 @@ export function MyPlanPage() {
           <Button variant="soft" onClick={() => setShowAddPath(true)}>＋ {L.addPathTitle}</Button>
         </div>
       )}
-
-      {/* ٣) المهام المباشرة — قسم مستقل عن المواد («أُنجزت» مطوية داخله) */}
-      <div id="direct-tasks">
-        <TasksPanel />
-      </div>
     </section>
   );
 }

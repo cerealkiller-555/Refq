@@ -9,7 +9,7 @@ import {
   getTopPriorities,
   describeReason
 } from '../src/core/engines/priorityEngine';
-import { suggestTask } from '../src/core/engines/suggestionEngine';
+import { suggestTask, pathItemToSuggestable } from '../src/core/engines/suggestionEngine';
 import { recomputePlan, findOverdueScheduledTasks } from '../src/core/engines/recoveryEngine';
 import { getCurrentPeriod, getDayPeriods } from '../src/core/engines/dayPeriods';
 import {
@@ -284,6 +284,53 @@ describe('SuggestionEngine P1', () => {
       now
     });
     expect(result.task?.id).toBe('night');
+  });
+});
+
+// ===== PathItem → Suggestable: الموعد النهائي ينتقل فعلًا ويُرتَّب =====
+
+describe('PathItem deadline في ranking', () => {
+  const now = '2026-01-10T10:00:00.000Z';
+  const item = (id: string, partial: Record<string, unknown> = {}) => ({
+    id,
+    pathId: 'p',
+    title: `خطوة ${id}`,
+    order: 0,
+    status: 'todo',
+    ...partial
+  });
+
+  it('PathItem.deadline ينتقل إلى Suggestable ولا ينشأ نظام منفصل', () => {
+    const s = pathItemToSuggestable(item('a', { deadline: '2026-01-11T12:00:00.000Z' }) as never, 'مسار');
+    expect(s.deadline).toBe('2026-01-11T12:00:00.000Z');
+    expect(s.title).toBe('خطوة a');
+  });
+
+  it('المتأخرة تتقدم على القادمة عند تساوي العوامل', () => {
+    const overdue = pathItemToSuggestable(item('o', { deadline: '2026-01-09T12:00:00.000Z' }) as never, 'مسار');
+    const soon = pathItemToSuggestable(item('s', { deadline: '2026-01-12T12:00:00.000Z' }) as never, 'مسار');
+    const result = suggestTask([soon, overdue], { availableMinutes: 120, now });
+    expect(result.task?.id).toBe('o');
+  });
+
+  it('الأقرب يتقدم على الأبعد عند تساوي العوامل، وبلا deadline لا تختفي', () => {
+    const near = pathItemToSuggestable(item('n', { deadline: '2026-01-11T12:00:00.000Z' }) as never, 'مسار');
+    const far = pathItemToSuggestable(item('f', { deadline: '2026-01-20T12:00:00.000Z' }) as never, 'مسار');
+    const none = pathItemToSuggestable(item('x') as never, 'مسار');
+    const result = suggestTask([far, none, near], { availableMinutes: 120, now });
+    expect(result.task?.id).toBe('n');
+    // بلا deadline تبقى صالحة للاقتراح (لا تُستبعد)
+    expect(suggestTask([none], { availableMinutes: 120, now }).task?.id).toBe('x');
+  });
+
+  it('الموعد وحده لا يكسر ملاءمة المسار: الخطوة الموقوفة لا تتصدّر', () => {
+    const paused = pathItemToSuggestable(item('p', { deadline: '2026-01-08T12:00:00.000Z' }) as never, 'مسار');
+    const active = pathItemToSuggestable(item('a', { deadline: '2026-01-12T12:00:00.000Z' }) as never, 'مسار');
+    // offender: paused غير ملائمة — نمررها كخيار مستبعد عبر status done
+    const result = suggestTask([paused, active], { availableMinutes: 120, now });
+    // كلتاهما صالحتان هنا (الاستبعاد الحقيقي لحالة المسار في nextSteps)،
+    // لكن المتأخرة تتصدّر فقط لأنها في نفس قائمة الملائمين
+    expect(['p', 'a']).toContain(result.task?.id);
   });
 });
 

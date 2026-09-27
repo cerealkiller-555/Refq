@@ -220,7 +220,6 @@ export const voice = {
   },
   myPlan: {
     navLabel: 'خطتي',
-    tabs: { plan: '📚 خطتي', tasks: '📋 المهام' },
     title: '📚 خطتي الدراسية',
     subtitle: 'موادكِ الدراسية بخطوات واضحة وجلسات هادئة — ركزي على خطوة واحدة تكفي للتقدم.',
     empty: 'لا توجد مواد دراسية بعد — أضيفي مادتكِ أو مساركِ الأول بزر «＋ مسار جديد» تحت هنا 🤍',
@@ -247,8 +246,6 @@ export const voice = {
     clearDeadline: 'بلا موعد',
     dueChip: 'النهاية {date}',
     overdueChip: 'متأخرة',
-    // ===== المهام المباشرة (بلا مادة) =====
-    directTasksTitle: 'مهام مباشرة',
     deleteItemConfirm: 'حذف الخطوة؟'
   },
 

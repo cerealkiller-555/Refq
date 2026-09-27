@@ -1,37 +1,35 @@
 // @vitest-environment jsdom
 // ============================================================
-// رِفق — اختبارات واجهة خطتي (MyPlanPage) الموحّدة
+// رِفق — اختبارات واجهة خطتي (MyPlanPage)
+// المسار الأساسي الوحيد: Learning Path → PathItem → Session.
 // 1) عرض حالة الفراغ عندما لا توجد مسارات
 // 2) عرض المواد مع نسبة الإنجاز وحساب "أين توقفتِ؟" والخطوة القادمة
 // 3) إطلاق جلسة دراسية يفعّل ActiveTaskBar وuseActiveTaskStore
 // 4) توسيع وطي قائمة الخطوات للمادة
-// 5) صفحة واحدة بلا تبويبات: اللمحة، الجدولة، لافتة اليوم الفائت،
-//    و?tab=tasks كتوافق خلفي مؤقت فقط
+// 5) /myplan بلا أي تجربة Direct Tasks: لا مهمة جديدة، لا تبويبات،
+//    لا #direct-tasks، و?tab=tasks يُتجاهل بلا انهيار
 // 6) الموعد النهائي للخطوة (deadline) + تحرير/حذف الخطوة من صفها
+// 7) إضافة PathItem من داخل المسار عبر useLearningStore
 // ============================================================
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, waitFor, fireEvent, within } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, cleanup, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { MyPlanPage } from '../../src/ui/screens/myplan/MyPlanPage';
 import { useLearningStore } from '../../src/core/store/useLearningStore';
 import { useActiveTaskStore } from '../../src/core/store/useActiveTaskStore';
-import { usePlanningStore } from '../../src/core/store/usePlanningStore';
 import { db } from '../../src/core/db/schema';
 import {
   learningPathRepository,
   pathItemRepository,
-  sessionRepository,
-  taskRepository,
-  calendarRepository
+  sessionRepository
 } from '../../src/core/db/repositories';
-import { localDateTimeISO, todayKey, addDaysKey, dateKey } from '../../src/core/engines/calendarEngine';
+import { todayKey, addDaysKey, dateKey } from '../../src/core/engines/calendarEngine';
 import { voice } from '../../src/i18n/voice';
-import type { LearningPath, PathItem, TaskRecord } from '../../src/core/types';
+import type { LearningPath, PathItem } from '../../src/core/types';
 
 const M = voice.myPlan;
-const cal = voice.planning.calendar;
 const L = voice.learning;
 
 const ts = { createdAt: '2026-01-01T08:00:00.000Z', updatedAt: '2026-01-01T08:00:00.000Z' };
@@ -60,18 +58,7 @@ function makeItem(over: Partial<PathItem> & { pathId: string }): PathItem {
   };
 }
 
-async function makeTask(partial: Partial<TaskRecord> = {}): Promise<TaskRecord> {
-  return taskRepository.create({
-    title: 'مهمة',
-    importance: 'low',
-    urgency: 'low',
-    estimatedDuration: 60,
-    status: 'todo',
-    ...partial
-  } as unknown as Parameters<typeof taskRepository.create>[0]);
-}
-
-/** MyPlanPage يستخدم useSearchParams — لازم MemoryRouter */
+/** MyPlanPage لا تعتمد أي query param — MemoryRouter للعزل فقط */
 function renderAt(entry = '/myplan') {
   return render(
     <MemoryRouter initialEntries={[entry]}>
@@ -85,7 +72,6 @@ beforeEach(async () => {
   await db.open();
   useLearningStore.setState({ paths: [], itemsByPath: {}, sessions: [] });
   useActiveTaskStore.setState({ active: null, timer: null });
-  usePlanningStore.setState({ tasks: [], events: [], replanResult: null });
 });
 
 afterEach(() => cleanup());
@@ -167,91 +153,54 @@ describe('MyPlanPage UI — خطتي', () => {
   });
 });
 
-describe('MyPlanPage UI — المهام المباشرة داخل خطتي (بلا تبويبات)', () => {
-  it('صفحة واحدة: لا تبويبات — المسارات وقسم المهام يظهران معًا', async () => {
+describe('MyPlanPage — بلا أي تجربة Direct Tasks', () => {
+  it('صفحة واحدة للمسارات فقط: لا مهمة جديدة، لا تبويبات، لا #direct-tasks', async () => {
     await learningPathRepository.create(makePath({ title: 'مادة موحّدة' }));
 
     renderAt();
 
     // المسارات…
     expect(await screen.findByText('مادة موحّدة')).toBeDefined();
-    // …وقسم المهام المباشرة في الصفحة نفسها، بلا أي تبويب
-    expect(await screen.findByPlaceholderText(voice.planning.quickAddPlaceholder)).toBeDefined();
+    // …وبلا أي أثر لتجربة المهام المباشرة
+    expect(screen.queryByPlaceholderText(voice.planning.quickAddPlaceholder)).toBeNull();
+    expect(screen.queryByText(voice.planning.addTitle)).toBeNull();
+    expect(screen.queryByText(voice.planning.tasksTitle)).toBeNull();
     expect(screen.queryAllByRole('tab')).toHaveLength(0);
     expect(screen.queryAllByRole('tablist')).toHaveLength(0);
-    // ولمحة المهام أعلى الصفحة
-    expect(screen.getByText(/مهمة مفتوحة/)).toBeDefined();
+    expect(document.getElementById('direct-tasks')).toBeNull();
+    // لا حقول Task (importance/urgency/duration/energy/deadline) خارج نموذج الخطوة
+    expect(document.body.textContent ?? '').not.toContain('الأهمية');
+    expect(document.body.textContent ?? '').not.toContain('الإلحاح');
   });
 
-  it('?tab=tasks يبقى مدعومًا كتوافق خلفي: يفتح خطتي مع قسم المهام بلا انهيار', async () => {
+  it('رابط قديم ?tab=tasks يُتجاهل بلا انهيار: نفس صفحة المسارات بلا قسم مهام', async () => {
     await learningPathRepository.create(makePath({ title: 'مادة الرابط القديم' }));
 
     renderAt('/myplan?tab=tasks');
 
     expect(await screen.findByText('مادة الرابط القديم')).toBeDefined();
-    expect(await screen.findByPlaceholderText(voice.planning.quickAddPlaceholder)).toBeDefined();
-    // قسم المهام موجود كمرساة تمرير للروابط القديمة
-    expect(document.getElementById('direct-tasks')).not.toBeNull();
+    expect(screen.queryByPlaceholderText(voice.planning.quickAddPlaceholder)).toBeNull();
+    expect(document.getElementById('direct-tasks')).toBeNull();
     expect(screen.queryAllByRole('tab')).toHaveLength(0);
   });
 
-  it('جدولة مهمة من لوحة المهام تنشئ حدثًا مربوطًا', async () => {
+  it('إضافة PathItem من داخل المسار تعمل والكتابة تمر عبر useLearningStore', async () => {
     const user = userEvent.setup();
-    const task = await makeTask({ title: 'حل واجب الفيزياء' });
-    await usePlanningStore.getState().load();
+    const p = await learningPathRepository.create(makePath({ title: 'مسار الكتابة' }));
+    const spy = vi.spyOn(useLearningStore.getState(), 'addItem');
 
     renderAt();
-    const scheduleBtn = await screen.findByRole('button', { name: cal.schedule.button });
-    await user.click(scheduleBtn);
+    expect(await screen.findByText('مسار الكتابة')).toBeDefined();
 
-    const dateInput = (await screen.findByLabelText(cal.schedule.date)) as HTMLInputElement;
-    const timeInput = screen.getByLabelText(cal.schedule.time) as HTMLInputElement;
-    const target = addDaysKey(todayKey(), 1);
-
-    // jsdom لا يدعم فتح المنتقي — نستخدم fireEvent لتفعيل onChange في React
-    fireEvent.change(dateInput, { target: { value: target } });
-    fireEvent.change(timeInput, { target: { value: '09:30' } });
-
-    await user.click(screen.getByRole('button', { name: cal.schedule.confirm }));
+    await user.click(await screen.findByRole('button', { name: `＋ ${L.addItem}` }));
+    await user.type(await screen.findByPlaceholderText(L.addItemPlaceholder), 'خطوة عبر المتجر');
+    await user.click(screen.getByRole('button', { name: L.addItem }));
 
     await waitFor(async () => {
-      const linked = await calendarRepository.getByLinkedTask(task.id);
-      expect(linked).toHaveLength(1);
-      expect(linked[0].kind).toBe('flexible');
-      expect(linked[0].start).toBe(localDateTimeISO(target, '09:30'));
+      expect((await pathItemRepository.getByPath(p.id)).map((i) => i.title)).toContain('خطوة عبر المتجر');
     });
-    const updated = await taskRepository.get(task.id);
-    expect(updated?.scheduledAt).toBe(localDateTimeISO(target, '09:30'));
-  });
-
-  it('لافتة اليوم الفائت تظهر للمتأخرات وتختفي بعد إعادة التوزيع اللطيفة', async () => {
-    const user = userEvent.setup();
-    const overdueTask = await makeTask({
-      title: 'مراجعة متأخرة',
-      scheduledAt: localDateTimeISO(addDaysKey(todayKey(), -2), '09:00')
-    });
-    await usePlanningStore.getState().load();
-
-    renderAt();
-
-    // اللافتة تظهر برسالة لطيفة بلا لوم
-    expect(await screen.findByText(cal.recovery.banner)).toBeDefined();
-
-    // الضغط على الزر ينفذ إعادة التوزيع — المهمة تتقرر في يوم قادم
-    await user.click(screen.getByRole('button', { name: cal.recovery.button }));
-
-    await waitFor(() => {
-      expect(usePlanningStore.getState().replanResult).not.toBeNull();
-    });
-    const updated = await taskRepository.get(overdueTask.id);
-    const sched = updated?.scheduledAt;
-    expect(sched).toBeTruthy();
-    // نقرأ اليوم المحلي لـ scheduledAt (المُولَّد بتوقيت الجهاز) لا شريحة UTC
-    expect(dateKey(new Date(sched!)) >= todayKey()).toBe(true);
-
-    // رسالة النجاح اللطيفة ظهرت واللافتة الأصلية اختفت
-    expect(screen.getByText(cal.recovery.applied)).toBeDefined();
-    expect(screen.queryByText(cal.recovery.banner)).toBeNull();
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
   });
 
   it('الموعد النهائي للخطوة: يُحفظ ظهيرةً محليًّا ويظهر شارة، والمتأخرة تُعلَّم «متأخرة»', async () => {
