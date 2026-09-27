@@ -19,6 +19,7 @@ import {
   updateTask as updateTaskLifecycle,
   onTaskLifecycleChange
 } from '../services/taskLifecycle';
+import { onLearningChange } from '../services/learningEvents';
 import { useActiveTaskStore } from './useActiveTaskStore';
 import { getTopPriorities } from '../engines/priorityEngine';
 import { suggestTask, type SuggestionResult, type Suggestable } from '../engines/suggestionEngine';
@@ -215,4 +216,11 @@ onTaskLifecycleChange(() => {
   void useTodayStore.getState().refresh().catch(() => {
     // قاعدة مغلقة أثناء الإيقاف — التحميل القادم يصحح
   });
+});
+
+// أي تغيّر في خطوات التعلّم من شاشة أخرى (إضافة/تعديل/حذف/إنجاز) ← إبطال لقطة الاقتراح،
+// فلا يُقترح «ماذا أفعل الآن؟» بخطوة حُذفت أو أُنجزت أو تغيّر عنوانها.
+// إبطال فقط (قراءة عند الطلب) — لا إعادة حساب هنا، ولا كتابة ⇒ لا حلقة.
+onLearningChange(() => {
+  useTodayStore.getState().clearSuggestion();
 });

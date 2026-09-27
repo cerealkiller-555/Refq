@@ -8,8 +8,10 @@
 // ============================================================
 
 import { create } from 'zustand';
-import { pathItemRepository, sessionRepository, taskRepository } from '../db/repositories';
+import { pathItemRepository, taskRepository } from '../db/repositories';
 import { completeTask as completeTaskLifecycle, onTaskLifecycleChange } from '../services/taskLifecycle';
+import { onLearningChange } from '../services/learningEvents';
+import { useLearningStore } from './useLearningStore';
 
 type ActiveKind = 'task' | 'learning';
 
@@ -63,6 +65,24 @@ function saveStoredTimer(t: ActiveTimer | null): void {
   }
 }
 
+/** إنجازات قيد التنفيذ — نداءان متزامنان لنفس الخطوة = جلسة واحدة لا اثنتان */
+const completing = new Set<string>();
+
+/**
+ * عمليات خطوات يبدأها الشريط نفسه — إشعار قناتها لا يستدعي إعادة قراءة:
+ * الشريط يقرأ حالته بنفسه بعدها (await load) فلا قراءتان لعملية واحدة.
+ * الحجب هنا في مستمع هذا المتجر فقط — بقية المستهلكين («اليوم») يستقبلون الإشعار كالمعتاد.
+ */
+let ownWrites = 0;
+async function runOwnWrite<T>(write: () => Promise<T>): Promise<T> {
+  ownWrites += 1;
+  try {
+    return await write();
+  } finally {
+    ownWrites -= 1;
+  }
+}
+
 interface ActiveTaskState {
   active: ActiveItem | null;
   loaded: boolean;
@@ -77,6 +97,12 @@ interface ActiveTaskState {
   confirmReplace: () => Promise<void>;
   cancelPending: () => void;
   completeActive: () => Promise<void>;
+  /**
+   * إنجاز خطوة تعلّم من أي شاشة (الشريط أو زر «تم» في «خطتي») — نقطة التسجيل الموحّدة:
+   * الجلسة المفتوحة (المؤقت الجاري لهذه الخطوة) تُسجَّل مرة واحدة ثم يُغلق مؤقتها،
+   * فلا تتكرر الجلسة مهما كان مسار الإنجاز. بلا جلسة مفتوحة لا تُسجَّل مدة مخترعة.
+   */
+  completeItem: (itemId: string) => Promise<void>;
   dismiss: () => void;
   unhide: () => void;
   pauseTimer: () => void;
@@ -157,7 +183,9 @@ export const useActiveTaskStore = create<ActiveTaskState>((set, get) => {
         return;
       }
       if (kind === 'learning') {
-        await pathItemRepository.update(id, { status: 'in_progress' });
+        // الكاتب الوحيد لحالة الخطوة: متجر التعلّم (يحدّث ما هو محمّل في «خطتي»)
+        // runOwnWrite: إشعار هذا التغيير لا يحتاج إعادة قراءة للشريط — يقرأ بنفسه أدناه
+        await runOwnWrite(() => useLearningStore.getState().setItemStatus(id, 'in_progress'));
       } else {
         await taskRepository.update(id, { status: 'in_progress' });
       }
@@ -173,7 +201,7 @@ export const useActiveTaskStore = create<ActiveTaskState>((set, get) => {
       if (active) {
         try {
           if (active.kind === 'learning') {
-            await pathItemRepository.update(active.id, { status: 'todo' });
+            await runOwnWrite(() => useLearningStore.getState().setItemStatus(active.id, 'todo'));
           } else {
             await taskRepository.update(active.id, { status: 'todo' });
           }
@@ -182,7 +210,9 @@ export const useActiveTaskStore = create<ActiveTaskState>((set, get) => {
         }
       }
       if (pending.kind === 'learning') {
-        await pathItemRepository.update(pending.id, { status: 'in_progress' });
+        await runOwnWrite(() =>
+          useLearningStore.getState().setItemStatus(pending.id, 'in_progress')
+        );
       } else {
         await taskRepository.update(pending.id, { status: 'in_progress' });
       }
@@ -196,13 +226,14 @@ export const useActiveTaskStore = create<ActiveTaskState>((set, get) => {
     completeActive: async () => {
       const { active } = get();
       if (!active) return;
+      if (active.kind === 'learning') {
+        // نقطة التسجيل الموحّدة: تسجّل الجلسة المفتوحة مرة واحدة وتغلق مؤقتها
+        await get().completeItem(active.id);
+        return;
+      }
       try {
-        if (active.kind === 'learning') {
-          await pathItemRepository.update(active.id, { status: 'done' });
-        } else {
-          // مسار دورة الحياة الموحّد — يحرّر أحداث المهمة المرنة مثل أي شاشة أخرى
-          await completeTaskLifecycle(active.id);
-        }
+        // مسار دورة الحياة الموحّد — يحرّر أحداث المهمة المرنة مثل أي شاشة أخرى
+        await completeTaskLifecycle(active.id);
       } catch {
         // فشل الإنجاز ← يبقى الشريط كما هو
         return;
@@ -210,6 +241,31 @@ export const useActiveTaskStore = create<ActiveTaskState>((set, get) => {
       saveStoredTimer(null);
       set({ timer: null });
       await get().load();
+    },
+
+    completeItem: async (itemId) => {
+      // ضغطة مزدوجة أو نداءان متزامنان ← إنجاز واحد وجلسة واحدة
+      if (completing.has(itemId)) return;
+      completing.add(itemId);
+      try {
+        const { active, timer } = get();
+        // الجلسة المفتوحة = مؤقت هذه الخطوة بالذات (مؤقت خطوة أخرى لا يُنسب لها)
+        const openSitting =
+          timer && timer.id === itemId ? { durationMinutes: timer.plannedMinutes } : undefined;
+        await runOwnWrite(() =>
+          useLearningStore.getState().completeItem(itemId, undefined, openSitting)
+        );
+        if (openSitting) {
+          // سُجّلت الجلسة ← إغلاق المؤقت فورًا، فلا تسجّلها محاولة قادمة من مسار آخر
+          saveStoredTimer(null);
+          set({ timer: null });
+        }
+        if (active?.id === itemId) await get().load();
+      } catch {
+        // فشل الإنجاز ← لا نغلق المؤقت (لا جلسة بلا إنجاز فعلي)
+      } finally {
+        completing.delete(itemId);
+      }
     },
 
     dismiss: () => set({ hidden: true }),
@@ -245,11 +301,12 @@ export const useActiveTaskStore = create<ActiveTaskState>((set, get) => {
       const { active, timer } = get();
       if (!active || active.kind !== 'learning') return;
       try {
-        await sessionRepository.create({
+        // الكاتب الوحيد للجلسات: متجر التعلّم (فيتحدّث «آخر توقف» والأعداد فورًا)
+        await useLearningStore.getState().addSession({
           pathItemId: active.id,
           date: new Date().toISOString(),
           durationMinutes: timer?.plannedMinutes ?? 30
-        } as Parameters<typeof sessionRepository.create>[0]);
+        });
       } catch {
         // فشل التسجيل لا يكسر — المؤقت يُمسح على أي حال
       }
@@ -260,6 +317,15 @@ export const useActiveTaskStore = create<ActiveTaskState>((set, get) => {
 
 // دورة حياة واحدة: أي إنجاز/حذف/تعديل من أي شاشة يُحدّث المهمة الجارية (قراءات فقط)
 onTaskLifecycleChange(() => {
+  void useActiveTaskStore.getState().load().catch(() => {
+    // قاعدة مغلقة أثناء الإيقاف — التحميل القادم يصحح
+  });
+});
+
+// خطوات التعلّم: أي إكمال من أي شاشة (مثل «خطتي») يوقف الجلسة ويُفرغ الشريط (قراءات فقط)
+onLearningChange(() => {
+  // عملية بدأها الشريط نفسه ← يقرأها بنفسه مباشرة، بلا إعادة قراءة مكرّرة لنفس العملية
+  if (ownWrites > 0) return;
   void useActiveTaskStore.getState().load().catch(() => {
     // قاعدة مغلقة أثناء الإيقاف — التحميل القادم يصحح
   });
