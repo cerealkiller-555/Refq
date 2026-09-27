@@ -20,6 +20,7 @@ import {
   requestGoogleAccessToken
 } from '../../../core/integrations/googleCalendar';
 import { usePlanningStore } from '../../../core/store/usePlanningStore';
+import { useActiveTaskStore } from '../../../core/store/useActiveTaskStore';
 import { voice } from '../../../i18n/voice';
 import { Button, Card } from '../../components';
 
@@ -147,6 +148,8 @@ export function SettingsPage() {
       setPending(null);
       setPendingName('');
       await refreshInfo();
+      // الشريط مركّب في التخطيط ولا يُعاد تحميله بالتنقل — نناديه بعد الاستيراد
+      await useActiveTaskStore.getState().load();
     } catch {
       setNote({ text: S.errorGeneric, tone: 'error' });
     } finally {
@@ -161,6 +164,8 @@ export function SettingsPage() {
       setNote({ text: S.dangerDone, tone: 'ok' });
       setAskDelete(false);
       await refreshInfo();
+      // المهمة الجارية قد تكون ممحووة — الشريط يحتاج قراءة جديدة
+      await useActiveTaskStore.getState().load();
     } catch {
       setNote({ text: S.errorGeneric, tone: 'error' });
     } finally {

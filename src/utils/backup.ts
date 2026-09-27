@@ -48,31 +48,43 @@ export function isVersionSupported(schemaVersion: number): boolean {
 }
 
 /**
- * استيراد كامل: يمحو كل شيء حاليًا (بعد تأكيد المستخدم) ثم يكتب البيانات المستوردة.
- * يعيد أسماء الجداول التي استُوردت، أو يرمي خطأ لو نسخة غير مدعومة.
+ * استيراد كامل: يمحو كل البيانات الحالية (بعد تأكيد المستخدم) ثم يكتب البيانات المستوردة.
+ * استبدال شامل لا دمج: كل جداول النسخة تُفرَّغ دائمًا — وغياب جدول في الملف = صفر فيه،
+ * حتى يطابق السلوك نص التأكيد ولا تختلط بيانات قديمة بناقصة. كاش Google يُمسح دائمًا.
+ * يعيد أسماء الجداول التي عُبّئت من الملف، أو يرمي خطأ لو نسخة غير مدعومة.
  */
 export async function importAll(snapshot: BackupSnapshot): Promise<string[]> {
   if (!isVersionSupported(snapshot.schemaVersion)) {
     throw new Error(`نسخة النسخة الاحتياطية (${snapshot.schemaVersion}) غير مدعومة.`);
   }
 
-  // يأقل في كل جدول الحالي ثم يضع البديل الجديد بضربة واحدة
+  // إفراغ شامل أولًا (استبدال لا دمج) — شاملًا جداول النسخة وكاش جوجل
   const d = snapshot.data;
   const results: string[] = [];
+  await Promise.all([
+    db.tasks.clear(),
+    db.calendarEvents.clear(),
+    db.paths.clear(),
+    db.pathItems.clear(),
+    db.sessions.clear(),
+    db.reflections.clear(),
+    db.energyCheckins.clear(),
+    db.shariaTexts.clear(),
+    db.prayerAnchors.clear(),
+    db.settings.clear(),
+    db.googleEventsCache.clear()
+  ]);
 
-  // كاش جوجل خارج النسخة الاحتياطية (بيانات جوجل تُعاد مزامنتها) — يُمسح حتى لا يبقى stale
-  await db.googleEventsCache.clear();
-
-  if (d.tasks) { await db.tasks.clear(); await db.tasks.bulkPut(d.tasks); results.push('tasks'); }
-  if (d.calendarEvents) { await db.calendarEvents.clear(); await db.calendarEvents.bulkPut(d.calendarEvents); results.push('calendarEvents'); }
-  if (d.paths) { await db.paths.clear(); await db.paths.bulkPut(d.paths); results.push('paths'); }
-  if (d.pathItems) { await db.pathItems.clear(); await db.pathItems.bulkPut(d.pathItems); results.push('pathItems'); }
-  if (d.sessions) { await db.sessions.clear(); await db.sessions.bulkPut(d.sessions); results.push('sessions'); }
-  if (d.reflections) { await db.reflections.clear(); await db.reflections.bulkPut(d.reflections); results.push('reflections'); }
-  if (d.energyCheckins) { await db.energyCheckins.clear(); await db.energyCheckins.bulkPut(d.energyCheckins); results.push('energyCheckins'); }
-  if (d.shariaTexts) { await db.shariaTexts.clear(); await db.shariaTexts.bulkPut(d.shariaTexts); results.push('shariaTexts'); }
-  if (d.prayerAnchors) { await db.prayerAnchors.clear(); await db.prayerAnchors.bulkPut(d.prayerAnchors); results.push('prayerAnchors'); }
-  if (d.settings) { await db.settings.clear(); await db.settings.bulkPut(d.settings); results.push('settings'); }
+  if (d.tasks) { await db.tasks.bulkPut(d.tasks); results.push('tasks'); }
+  if (d.calendarEvents) { await db.calendarEvents.bulkPut(d.calendarEvents); results.push('calendarEvents'); }
+  if (d.paths) { await db.paths.bulkPut(d.paths); results.push('paths'); }
+  if (d.pathItems) { await db.pathItems.bulkPut(d.pathItems); results.push('pathItems'); }
+  if (d.sessions) { await db.sessions.bulkPut(d.sessions); results.push('sessions'); }
+  if (d.reflections) { await db.reflections.bulkPut(d.reflections); results.push('reflections'); }
+  if (d.energyCheckins) { await db.energyCheckins.bulkPut(d.energyCheckins); results.push('energyCheckins'); }
+  if (d.shariaTexts) { await db.shariaTexts.bulkPut(d.shariaTexts); results.push('shariaTexts'); }
+  if (d.prayerAnchors) { await db.prayerAnchors.bulkPut(d.prayerAnchors); results.push('prayerAnchors'); }
+  if (d.settings) { await db.settings.bulkPut(d.settings); results.push('settings'); }
 
   return results;
 }
