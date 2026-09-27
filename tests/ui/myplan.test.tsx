@@ -1,15 +1,17 @@
 // @vitest-environment jsdom
 // ============================================================
-// رِفق — اختبارات واجهة خطتي (MyPlanPage)
+// رِفق — اختبارات واجهة خطتي (MyPlanPage) الموحّدة
 // 1) عرض حالة الفراغ عندما لا توجد مسارات
 // 2) عرض المواد مع نسبة الإنجاز وحساب "أين توقفتِ؟" والخطوة القادمة
 // 3) إطلاق جلسة دراسية يفعّل ActiveTaskBar وuseActiveTaskStore
 // 4) توسيع وطي قائمة الخطوات للمادة
-// 5) تبويب المهام (?tab=tasks): اللمحة، الجدولة، لافتة اليوم الفائت
+// 5) صفحة واحدة بلا تبويبات: اللمحة، الجدولة، لافتة اليوم الفائت،
+//    و?tab=tasks كتوافق خلفي مؤقت فقط
+// 6) الموعد النهائي للخطوة (deadline) + تحرير/حذف الخطوة من صفها
 // ============================================================
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, cleanup, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { MyPlanPage } from '../../src/ui/screens/myplan/MyPlanPage';
@@ -30,6 +32,7 @@ import type { LearningPath, PathItem, TaskRecord } from '../../src/core/types';
 
 const M = voice.myPlan;
 const cal = voice.planning.calendar;
+const L = voice.learning;
 
 const ts = { createdAt: '2026-01-01T08:00:00.000Z', updatedAt: '2026-01-01T08:00:00.000Z' };
 
@@ -164,25 +167,32 @@ describe('MyPlanPage UI — خطتي', () => {
   });
 });
 
-describe('MyPlanPage UI — تبويب المهام', () => {
-  it('التبديل إلى «📋 المهام» يعرض لوحة المهام والعودة تُخفيها', async () => {
-    const user = userEvent.setup();
+describe('MyPlanPage UI — المهام المباشرة داخل خطتي (بلا تبويبات)', () => {
+  it('صفحة واحدة: لا تبويبات — المسارات وقسم المهام يظهران معًا', async () => {
+    await learningPathRepository.create(makePath({ title: 'مادة موحّدة' }));
+
     renderAt();
 
-    await user.click(await screen.findByRole('tab', { name: M.tabs.tasks }));
-    // لوحة المهام ظهرت — نموذج إضافة سطر واحد
+    // المسارات…
+    expect(await screen.findByText('مادة موحّدة')).toBeDefined();
+    // …وقسم المهام المباشرة في الصفحة نفسها، بلا أي تبويب
     expect(await screen.findByPlaceholderText(voice.planning.quickAddPlaceholder)).toBeDefined();
-    expect(screen.getByRole('tab', { name: M.tabs.tasks }).getAttribute('aria-selected')).toBe('true');
-
-    // العودة إلى خطتي
-    await user.click(screen.getByRole('tab', { name: M.tabs.plan }));
-    expect(screen.queryByPlaceholderText(voice.planning.quickAddPlaceholder)).toBeNull();
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+    expect(screen.queryAllByRole('tablist')).toHaveLength(0);
+    // ولمحة المهام أعلى الصفحة
+    expect(screen.getByText(/مهمة مفتوحة/)).toBeDefined();
   });
 
-  it('فتح الرابط مباشرة بـ ?tab=tasks يعرض لوحة المهام', async () => {
+  it('?tab=tasks يبقى مدعومًا كتوافق خلفي: يفتح خطتي مع قسم المهام بلا انهيار', async () => {
+    await learningPathRepository.create(makePath({ title: 'مادة الرابط القديم' }));
+
     renderAt('/myplan?tab=tasks');
-    expect(await screen.findByText(/مهمة مفتوحة/)).toBeDefined();
-    expect(screen.getByRole('tab', { name: M.tabs.tasks }).getAttribute('aria-selected')).toBe('true');
+
+    expect(await screen.findByText('مادة الرابط القديم')).toBeDefined();
+    expect(await screen.findByPlaceholderText(voice.planning.quickAddPlaceholder)).toBeDefined();
+    // قسم المهام موجود كمرساة تمرير للروابط القديمة
+    expect(document.getElementById('direct-tasks')).not.toBeNull();
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
   });
 
   it('جدولة مهمة من لوحة المهام تنشئ حدثًا مربوطًا', async () => {
@@ -190,7 +200,7 @@ describe('MyPlanPage UI — تبويب المهام', () => {
     const task = await makeTask({ title: 'حل واجب الفيزياء' });
     await usePlanningStore.getState().load();
 
-    renderAt('/myplan?tab=tasks');
+    renderAt();
     const scheduleBtn = await screen.findByRole('button', { name: cal.schedule.button });
     await user.click(scheduleBtn);
 
@@ -222,7 +232,7 @@ describe('MyPlanPage UI — تبويب المهام', () => {
     });
     await usePlanningStore.getState().load();
 
-    renderAt('/myplan?tab=tasks');
+    renderAt();
 
     // اللافتة تظهر برسالة لطيفة بلا لوم
     expect(await screen.findByText(cal.recovery.banner)).toBeDefined();
@@ -242,6 +252,119 @@ describe('MyPlanPage UI — تبويب المهام', () => {
     // رسالة النجاح اللطيفة ظهرت واللافتة الأصلية اختفت
     expect(screen.getByText(cal.recovery.applied)).toBeDefined();
     expect(screen.queryByText(cal.recovery.banner)).toBeNull();
+  });
+
+  it('الموعد النهائي للخطوة: يُحفظ ظهيرةً محليًّا ويظهر شارة، والمتأخرة تُعلَّم «متأخرة»', async () => {
+    const user = userEvent.setup();
+    const p = await learningPathRepository.create(makePath({ title: 'مسار المواعيد' }));
+    const due = addDaysKey(todayKey(), 3);
+
+    renderAt();
+    expect(await screen.findByText('مسار المواعيد')).toBeDefined();
+
+    // إضافة خطوة بموعد نهائي من نموذج الخطوة
+    await user.click(await screen.findByRole('button', { name: `＋ ${L.addItem}` }));
+    await user.type(await screen.findByPlaceholderText(L.addItemPlaceholder), 'ورقة بحثية');
+    fireEvent.change(screen.getByLabelText(M.itemDeadline), { target: { value: due } });
+    await user.click(screen.getByRole('button', { name: L.addItem }));
+
+    // يُخزَّن ظهيرةً محليًّا — نفس عُرف المهام، بلا إزاحة يوم
+    await waitFor(async () => {
+      const saved = await pathItemRepository.getByPath(p.id);
+      expect(saved).toHaveLength(1);
+      expect(saved[0].deadline).toBe(new Date(`${due}T12:00:00`).toISOString());
+    });
+    const savedItem = (await pathItemRepository.getByPath(p.id))[0];
+    expect(dateKey(new Date(savedItem.deadline!))).toBe(due);
+
+    // الشارة تظهر في صف الخطوة، ولا «متأخرة» لموعد قادم
+    await user.click(await screen.findByRole('button', { name: new RegExp(M.expandItems) }));
+    const list = await screen.findByRole('list', { name: 'مسار المواعيد' });
+    expect(within(list).getByText(M.dueChip.replace('{date}', due))).toBeDefined();
+    expect(within(list).queryByText(`⏳ ${M.overdueChip}`)).toBeNull();
+
+    // وخطوة موعدها مضى تُعلَّم «متأخرة»
+    await pathItemRepository.create(
+      makeItem({
+        pathId: p.id,
+        title: 'خطوة متأخرة الموعد',
+        order: 1,
+        deadline: new Date(`${addDaysKey(todayKey(), -2)}T12:00:00`).toISOString()
+      })
+    );
+    await useLearningStore.getState().load();
+    await waitFor(() => {
+      expect(within(list).getByText(`⏳ ${M.overdueChip}`)).toBeDefined();
+    });
+  });
+
+  it('تحرير عنوان الخطوة من صفها وحذفها بتأكيد واحد', async () => {
+    const user = userEvent.setup();
+    const p = await learningPathRepository.create(makePath({ title: 'مسار الصف' }));
+    const step = await pathItemRepository.create(makeItem({ pathId: p.id, title: 'عنوان قديم', order: 0 }));
+
+    renderAt();
+    expect(await screen.findByText('مسار الصف')).toBeDefined();
+    await user.click(await screen.findByRole('button', { name: new RegExp(M.expandItems) }));
+
+    const list = await screen.findByRole('list', { name: 'مسار الصف' });
+    // الضغط على العنوان يفتح محررًا داخل الصف — كالمهام
+    await user.click(within(list).getByText('عنوان قديم'));
+    const editor = await screen.findByLabelText(voice.common.edit);
+    await user.clear(editor);
+    await user.type(editor, 'عنوان محدّث{Enter}');
+
+    await waitFor(async () => {
+      expect((await pathItemRepository.get(step.id))?.title).toBe('عنوان محدّث');
+    });
+    await waitFor(() => {
+      expect(within(list).getByText('عنوان محدّث')).toBeDefined();
+    });
+    const row = within(list).getByText('عنوان محدّث').closest('li');
+    expect(row).not.toBeNull();
+    const rowEl = row as HTMLElement;
+
+    // الحذف: ضغطة تسأل…
+    await user.click(within(rowEl).getByRole('button', { name: voice.common.delete }));
+    expect(within(rowEl).getByText(M.deleteItemConfirm)).toBeDefined();
+    expect(await pathItemRepository.getAll()).toHaveLength(1);
+
+    // …وتأكيد واحد يحذف
+    await user.click(within(rowEl).getByRole('button', { name: voice.common.delete }));
+    await waitFor(async () => {
+      expect(await pathItemRepository.get(step.id)).toBeUndefined();
+    });
+    expect(screen.queryByText('عنوان محدّث')).toBeNull();
+  });
+
+  it('حذف الخطوة الجارية من صفّها يُفرّغ الشريط عبر قناة التعلّم (بلا نداء تحميل موضعي)', async () => {
+    const user = userEvent.setup();
+    const p = await learningPathRepository.create(makePath({ title: 'مسار الحذف الجاري' }));
+    const step = await pathItemRepository.create(
+      makeItem({ pathId: p.id, title: 'الخطوة الجارية', order: 0, estimatedDuration: 20 })
+    );
+    // خطوة جارية فعلًا في الشريط (مؤقت مفتوح)
+    await useActiveTaskStore.getState().startItem(step.id, 'learning', 'الخطوة الجارية', 20);
+    expect(useActiveTaskStore.getState().active?.id).toBe(step.id);
+
+    renderAt();
+    expect(await screen.findByText('مسار الحذف الجاري')).toBeDefined();
+    await user.click(await screen.findByRole('button', { name: new RegExp(M.expandItems) }));
+
+    const list = await screen.findByRole('list', { name: 'مسار الحذف الجاري' });
+    const row = within(list).getByText('الخطوة الجارية').closest('li') as HTMLElement;
+    // ضغطة تسأل، وتأكيد واحد يحذف
+    await user.click(within(row).getByRole('button', { name: voice.common.delete }));
+    await user.click(within(row).getByRole('button', { name: voice.common.delete }));
+
+    await waitFor(async () => {
+      expect(await pathItemRepository.get(step.id)).toBeUndefined();
+    });
+    // الشريط تفرّغ عبر إشعار القناة (removed) — لا نداء load من الشاشة
+    await waitFor(() => {
+      expect(useActiveTaskStore.getState().active).toBeNull();
+    });
+    expect(useActiveTaskStore.getState().timer).toBeNull();
   });
 });
 
@@ -272,6 +395,139 @@ describe('MyPlan — تأكيد حذف المسار', () => {
     await waitFor(() => {
       expect(screen.queryByText('مسار للحذف')).toBeNull();
     });
+  });
+});
+
+describe('MyPlanPage — صحة حالات المسار (P0-1)', () => {
+  it('المسار الموقوف يعرض خطواته وتقدّمه ولا يقول «أتممتِ كل خطواته»', async () => {
+    const p = await learningPathRepository.create(makePath({ title: 'تفسير موقوف', status: 'paused' }));
+    await pathItemRepository.create(makeItem({ pathId: p.id, title: 'سورة الكوثر', order: 0, status: 'done' }));
+    await pathItemRepository.create(makeItem({ pathId: p.id, title: 'سورة الناس', order: 1, status: 'todo' }));
+
+    renderAt();
+
+    // البطاقة تظهر بحالتها الصحيحة…
+    expect(await screen.findByText('تفسير موقوف')).toBeDefined();
+    expect(screen.getByText(M.pausedTag)).toBeDefined();
+    // …وتقدّمها الحقيقي محسوبًا من خطواتها المحمَّلة (1 من 2)
+    expect(screen.getByText(/أُنجز 1 من 2/)).toBeDefined();
+    // الخطأ القديم: لا بانر «أتممتِ كل خطوات» لمسار لم يكمل خطواته
+    expect(screen.queryByText(M.allDone)).toBeNull();
+    // وخطوته التالية ظاهرة، وقائمة خطواته متاحة (كانت تختفي تمامًا)
+    expect(screen.getByText('سورة الناس')).toBeDefined();
+    expect(screen.getByRole('button', { name: new RegExp(M.expandItems) })).toBeDefined();
+  });
+
+  it('المسار بلا خطوات: «لا خطوات بعد» — لا «أتممتِ كل خطوات» ولا تقدّم وهمي', async () => {
+    await learningPathRepository.create(makePath({ title: 'مسار بلا خطوات' }));
+
+    renderAt();
+
+    expect(await screen.findByText('مسار بلا خطوات')).toBeDefined();
+    expect(screen.getByText(M.noStepsYet)).toBeDefined();
+    expect(screen.queryByText(M.allDone)).toBeNull();
+    // لا شريط تقدّم «أُنجز 0 من 0»
+    expect(screen.queryByText(/أُنجز 0 من 0/)).toBeNull();
+  });
+
+  it('المسار المكتملة خطواته: يظهر بانر الأتمتة ولا يظهر نص «لا خطوات بعد»', async () => {
+    const p = await learningPathRepository.create(makePath({ title: 'كتاب أُتمّ' }));
+    await pathItemRepository.create(makeItem({ pathId: p.id, title: 'الفصل الأول', order: 0, status: 'done' }));
+
+    renderAt();
+
+    expect(await screen.findByText('كتاب أُتمّ')).toBeDefined();
+    expect(screen.getByText(M.allDone)).toBeDefined();
+    expect(screen.queryByText(M.noStepsYet)).toBeNull();
+    expect(screen.getByText(/أُنجز 1 من 1/)).toBeDefined();
+  });
+});
+
+describe('MyPlanPage UI — إنجاز الخطوات من الصف (P0-2)', () => {
+  it('زر «تم» يُنجز الخطوة: الـDB + تقدّم حيّ + اختفاء الزر، ثم بانر الأتمتة', async () => {
+    const user = userEvent.setup();
+    const p = await learningPathRepository.create(makePath({ title: 'مسار الإنجاز' }));
+    const first = await pathItemRepository.create(makeItem({ pathId: p.id, title: 'الخطوة الأولى', order: 0 }));
+    await pathItemRepository.create(makeItem({ pathId: p.id, title: 'الخطوة الثانية', order: 1 }));
+
+    renderAt();
+    expect(await screen.findByText('مسار الإنجاز')).toBeDefined();
+    await user.click(await screen.findByRole('button', { name: /عرض كل الخطوات/ }));
+
+    // زر «تم» لكل خطوة غير منجزة
+    expect(screen.getAllByRole('button', { name: 'تم' })).toHaveLength(2);
+
+    await user.click(screen.getAllByRole('button', { name: 'تم' })[0]);
+
+    expect((await pathItemRepository.get(first.id))?.status).toBe('done');
+    await waitFor(() => {
+      expect(screen.getByText(/أُنجز 1 من 2/)).toBeDefined();
+    });
+    expect(screen.getAllByRole('button', { name: 'تم' })).toHaveLength(1);
+
+    // إنجاز الثانية ← البانر واختفاء كل الأزرار
+    await user.click(screen.getAllByRole('button', { name: 'تم' })[0]);
+    await waitFor(() => {
+      expect(screen.getByText(M.allDone)).toBeDefined();
+    });
+    expect(screen.getByText(/أُنجز 2 من 2/)).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'تم' })).toBeNull();
+  });
+
+  it('إنجاز الخطوة الجارية من «خطتي» يوقف الجلسة ويسجّل جلسة واحدة ويحدّث آخر توقف والعدّ', async () => {
+    const user = userEvent.setup();
+    const p = await learningPathRepository.create(makePath({ title: 'مسار الجلسة' }));
+    const only = await pathItemRepository.create(
+      makeItem({ pathId: p.id, title: 'خطوة وحيدة', order: 0, estimatedDuration: 25 })
+    );
+
+    renderAt();
+    expect(await screen.findByText('مسار الجلسة')).toBeDefined();
+
+    await user.click(await screen.findByRole('button', { name: /ابدئي جلسة/ }));
+    await waitFor(() => {
+      expect(useActiveTaskStore.getState().active?.id).toBe(only.id);
+    });
+    expect(useActiveTaskStore.getState().timer?.plannedMinutes).toBe(25);
+
+    // إنجازها من الصف — القناة وحدها توقف الجلسة
+    await user.click(await screen.findByRole('button', { name: /عرض كل الخطوات/ }));
+    await user.click(screen.getByRole('button', { name: 'تم' }));
+
+    await waitFor(() => {
+      expect(useActiveTaskStore.getState().active).toBeNull();
+    });
+    expect(useActiveTaskStore.getState().timer).toBeNull();
+    expect((await pathItemRepository.get(only.id))?.status).toBe('done');
+    expect(await screen.findByText(M.allDone)).toBeDefined();
+    // جلسة واحدة بمدة المؤقت — لا صفر ولا اثنتان
+    const sessions = await sessionRepository.getByPathItem(only.id);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].durationMinutes).toBe(25);
+    // «آخر توقف» وعدّ الجلسات يعكسان التسجيل الجديد فورًا
+    expect(screen.getByText(/«خطوة وحيدة»/)).toBeDefined();
+    expect(screen.getByText('1 جلسات مسجلة')).toBeDefined();
+  });
+
+  it('إنجاز خطوة بلا جلسة مفتوحة لا يخترع جلسة ولا عدًّا وهميًّا', async () => {
+    const user = userEvent.setup();
+    const p = await learningPathRepository.create(makePath({ title: 'مسار بلا مؤقت' }));
+    const only = await pathItemRepository.create(
+      makeItem({ pathId: p.id, title: 'خطوة سريعة', order: 0 })
+    );
+
+    renderAt();
+    expect(await screen.findByText('مسار بلا مؤقت')).toBeDefined();
+
+    // إنجاز مباشر بلا مؤقت جارٍ ← لا جلسة تُخترع
+    await user.click(await screen.findByRole('button', { name: /عرض كل الخطوات/ }));
+    await user.click(screen.getByRole('button', { name: 'تم' }));
+
+    expect(await screen.findByText(M.allDone)).toBeDefined();
+    expect(await sessionRepository.getByPathItem(only.id)).toHaveLength(0);
+    expect(screen.queryByText(/جلسات مسجلة/)).toBeNull();
+    // «آخر توقف» يظل معروضًا من سجل الخطوة المكتملة (لا فراغ في الواجهة)
+    expect(screen.getByText(/«خطوة سريعة»/)).toBeDefined();
   });
 });
 

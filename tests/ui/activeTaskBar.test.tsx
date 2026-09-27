@@ -13,7 +13,13 @@ import { render, screen, cleanup, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ActiveTaskBar } from '../../src/ui/components/ActiveTaskBar';
 import { useActiveTaskStore } from '../../src/core/store/useActiveTaskStore';
-import { taskRepository } from '../../src/core/db/repositories';
+import { useLearningStore } from '../../src/core/store/useLearningStore';
+import {
+  taskRepository,
+  learningPathRepository,
+  pathItemRepository,
+  sessionRepository
+} from '../../src/core/db/repositories';
 import { db } from '../../src/core/db/schema';
 import { voice } from '../../src/i18n/voice';
 
@@ -28,6 +34,23 @@ async function seedTask(title: string): Promise<string> {
     status: 'todo'
   } as Parameters<typeof taskRepository.create>[0]);
   return task.id;
+}
+
+async function seedLearningItem(title: string): Promise<string> {
+  const path = await learningPathRepository.create({
+    title: 'مسار الشريط',
+    type: 'course',
+    status: 'active',
+    order: 1
+  } as Parameters<typeof learningPathRepository.create>[0]);
+  const item = await pathItemRepository.create({
+    pathId: path.id,
+    title,
+    order: 1,
+    status: 'todo',
+    estimatedDuration: 25
+  } as Parameters<typeof pathItemRepository.create>[0]);
+  return item.id;
 }
 
 beforeEach(async () => {
@@ -142,5 +165,69 @@ describe('ActiveTaskBar — شريط المهمة الجارية', () => {
     });
     expect((await taskRepository.get(a))?.status).toBe('todo');
     expect((await taskRepository.get(b))?.status).toBe('in_progress');
+  });
+
+  it('إكمال خطوة تعلّم من الشريط (✓) يسجّل جلسة واحدة بمدة المؤقت', async () => {
+    const user = userEvent.setup();
+    useLearningStore.setState({ paths: [], itemsByPath: {}, sessions: [] });
+    const itemId = await seedLearningItem('محاضرة الشريط');
+    await useActiveTaskStore.getState().startItem(itemId, 'learning', 'محاضرة الشريط', 25);
+
+    render(<ActiveTaskBar />);
+    await screen.findByText('محاضرة الشريط');
+
+    await user.click(screen.getByRole('button', { name: voice.common.complete }));
+
+    await waitFor(async () => {
+      expect((await pathItemRepository.get(itemId))?.status).toBe('done');
+    });
+    const sessions = await sessionRepository.getByPathItem(itemId);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].durationMinutes).toBe(25);
+    // الجلسة أُغلقت والمؤقت مُسح والشريط خرج
+    await waitFor(() => {
+      expect(useActiveTaskStore.getState().active).toBeNull();
+    });
+    expect(useActiveTaskStore.getState().timer).toBeNull();
+  });
+
+  it('تعديل عنوان الخطوة الجارية من شاشة أخرى يظهر في الشريط (قناة التعلّم)', async () => {
+    useLearningStore.setState({ paths: [], itemsByPath: {}, sessions: [] });
+    const itemId = await seedLearningItem('عنوان قديم');
+    await useActiveTaskStore.getState().startItem(itemId, 'learning', 'عنوان قديم', 25);
+
+    render(<ActiveTaskBar />);
+    await screen.findByText('عنوان قديم');
+
+    // تعديل من شاشة أخرى (مثل «خطتي») — بلا أي نداء تحميل موضعي
+    await act(async () => {
+      await useLearningStore.getState().updateItem(itemId, { title: 'عنوان محدّث' });
+    });
+
+    expect(await screen.findByText('عنوان محدّث')).toBeDefined();
+    await waitFor(() => {
+      expect(screen.queryByText('عنوان قديم')).toBeNull();
+    });
+    // المؤقت والجلسة المفتوحة لم تُمسّا
+    expect(useActiveTaskStore.getState().timer?.id).toBe(itemId);
+  });
+
+  it('حذف الخطوة الجارية من «خطتي» يُفرّغ الشريط (قناة التعلّم بلا تعويض موضعي)', async () => {
+    useLearningStore.setState({ paths: [], itemsByPath: {}, sessions: [] });
+    const itemId = await seedLearningItem('خطوة تُحذف');
+    await useActiveTaskStore.getState().startItem(itemId, 'learning', 'خطوة تُحذف', 25);
+
+    render(<ActiveTaskBar />);
+    await screen.findByText('خطوة تُحذف');
+
+    await act(async () => {
+      await useLearningStore.getState().deleteItem(itemId);
+    });
+
+    await waitFor(() => {
+      expect(useActiveTaskStore.getState().active).toBeNull();
+      expect(document.querySelector('.active-task-bar')).toBeNull();
+    });
+    expect(useActiveTaskStore.getState().timer).toBeNull();
   });
 });

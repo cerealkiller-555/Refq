@@ -1,7 +1,9 @@
 // ============================================================
-// رِفق — Screen: خطتي (MyPlan)
-// تبويبان: 📚 خطتي (المسارات والمواد) + 📋 المهام (TasksPanel).
-// التبويب مقروء من الرابط ?tab=tasks ليخدمه زر «كل المهام» في اليوم.
+// رِفق — Screen: خطتي (MyPlan) — صفحة موحّدة بلا تبويبات
+// الترتيب: لمحة المهام ولافتة التعافي ← بطاقات المواد وخطواتها
+// (مع الموعد النهائي، وتحرير/حذف الخطوة من صفها) ← قسم «مهام مباشرة».
+// ?tab=tasks بقي مقروءًا كتوافق خلفي مؤقت (زر «كل المهام» في اليوم)
+// فيمرّر بلطف إلى قسم المهام بدل تبديل تبويب.
 // أدوات الإدارة موروثة من شاشة «رحلتي»: مسار جديد، إضافة خطوة،
 // إيقاف مؤقت/استئناف، وحذف — بلا أي ضغط، خطوة واحدة تكفي.
 // ============================================================
@@ -11,14 +13,31 @@ import { useSearchParams } from 'react-router-dom';
 import { useLearningStore } from '../../../core/store/useLearningStore';
 import { useActiveTaskStore } from '../../../core/store/useActiveTaskStore';
 import { nextSteps, pathProgress } from '../../../core/engines/learningEngine';
+import { dateKey, todayKey } from '../../../core/engines/calendarEngine';
 import { voice } from '../../../i18n/voice';
 import { Card, Button, Chip, EmptyState } from '../../components';
-import { TasksPanel } from './TasksPanel';
+import { TasksPanel, TasksGlance } from './TasksPanel';
 import type { LearningPath, LearningPathType, PathItem, Session } from '../../../core/types';
 
 const M = voice.myPlan;
 const L = voice.learning;
 const PATH_TYPES: LearningPathType[] = ['university', 'course', 'religious_science', 'book', 'quran'];
+
+/** متأخرة: موعد نهائي مضى ولم تُنجز الخطوة (مقارنة بمفتاح اليوم المحلي) */
+function isItemOverdue(item: PathItem): boolean {
+  return !!item.deadline && item.status !== 'done' && dateKey(new Date(item.deadline)) < todayKey();
+}
+
+/** شارة الموعد النهائي — تصير «متأخرة» بلون تحذيري إذا مضى الموعد */
+function ItemDeadlineChip({ item }: { item: PathItem }) {
+  if (!item.deadline) return null;
+  if (isItemOverdue(item)) {
+    return <span className="glance-chip warn">{`⏳ ${M.overdueChip}`}</span>;
+  }
+  return (
+    <span className="glance-chip">{M.dueChip.replace('{date}', dateKey(new Date(item.deadline)))}</span>
+  );
+}
 
 export function MyPlanPage() {
   const paths = useLearningStore((s) => s.paths);
@@ -28,27 +47,45 @@ export function MyPlanPage() {
 
   const activeTask = useActiveTaskStore((s) => s.active);
   const startItem = useActiveTaskStore((s) => s.startItem);
+  /** الإنجاز من الصف: نقطة التسجيل الموحّدة للجلسة (تعرف المؤقت الجاري) */
+  const completeItem = useActiveTaskStore((s) => s.completeItem);
   const addPath = useLearningStore((s) => s.addPath);
   const setPathStatus = useLearningStore((s) => s.setPathStatus);
   const deletePath = useLearningStore((s) => s.deletePath);
+  const updateItem = useLearningStore((s) => s.updateItem);
+  const deleteItem = useLearningStore((s) => s.deleteItem);
 
   const [expandedPaths, setExpandedPaths] = useState<Record<string, boolean>>({});
   /** إضافة خطوة جديدة — مسار واحد مفتوح في كل مرة */
   const [itemFormFor, setItemFormFor] = useState<string | null>(null);
   /** تأكيد حذف مسار — الحذف يمس خطواته فلا يتم بضغطة واحدة */
   const [confirmDeletePath, setConfirmDeletePath] = useState<string | null>(null);
+  /** تحرير عنوان خطوة داخل صفها — كضغط العنوان في المهام */
+  const [editingItem, setEditingItem] = useState<{ id: string; value: string } | null>(null);
+  /** تأكيد حذف خطوة — نفس عُرف تأكيد حذف المسار */
+  const [confirmDeleteItem, setConfirmDeleteItem] = useState<string | null>(null);
   /** نموذج مسار جديد */
   const [showAddPath, setShowAddPath] = useState(false);
   const [pathName, setPathName] = useState('');
   const [pathType, setPathType] = useState<LearningPathType>('university');
 
-  // التبويب مقروء من الرابط حتى يخدمه زر «كل المهام» في شاشة اليوم
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') === 'tasks' ? 'tasks' : 'plan';
+  // توافق خلفي مؤقت: زر «كل المهام» في اليوم كان يستخدم ?tab=tasks —
+  // نقرؤه ونمرّر مرة واحدة إلى قسم المهام، بلا تبويبات وبلا إعادة كتابة للرابط.
+  const [searchParams] = useSearchParams();
+  const legacyTasksLink = searchParams.get('tab') === 'tasks';
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!legacyTasksLink) return;
+    // بعد أول رسم فقط — مرة واحدة، وبلا أي تأثير على التنقل العادي
+    const t = setTimeout(() => {
+      document.getElementById('direct-tasks')?.scrollIntoView?.({ block: 'start' });
+    }, 0);
+    return () => clearTimeout(t);
+  }, [legacyTasksLink]);
 
   const globalNextSteps = useMemo(() => {
     return nextSteps(paths, itemsByPath);
@@ -107,6 +144,20 @@ export function MyPlanPage() {
     await startItem(item.id, 'learning', item.title, duration);
   };
 
+  /** تحرير عنوان خطوة — الكتابة في الـDB عبر updateItem ثم إغلاق المحرر */
+  const saveItemTitle = async (id: string) => {
+    const value = editingItem?.id === id ? editingItem.value.trim() : '';
+    if (value) await updateItem(id, { title: value });
+    setEditingItem(null);
+  };
+
+  /** حذف خطوة بعد تأكيد — الطريق الوحيد للحذف: متجر التعلّم،
+   *  والشريط يُفرَّغ عبر قناة التعلّم (removed) بلا نداء تحميل موضعي */
+  const handleDeleteItem = async (id: string) => {
+    setConfirmDeleteItem(null);
+    await deleteItem(id);
+  };
+
   const submitAddPath = async () => {
     const value = pathName.trim();
     if (!value) return;
@@ -127,30 +178,10 @@ export function MyPlanPage() {
         <p className="screen-subtitle muted">{M.subtitle}</p>
       </header>
 
-      {/* التبويبان: خطتي | المهام */}
-      <div className="tabs" role="tablist">
-        <button
-          role="tab"
-          aria-selected={activeTab === 'plan'}
-          className={`tab${activeTab === 'plan' ? ' active' : ''}`}
-          onClick={() => setSearchParams({})}
-        >
-          {M.tabs.plan}
-        </button>
-        <button
-          role="tab"
-          aria-selected={activeTab === 'tasks'}
-          className={`tab${activeTab === 'tasks' ? ' active' : ''}`}
-          onClick={() => setSearchParams({ tab: 'tasks' })}
-        >
-          {M.tabs.tasks}
-        </button>
-      </div>
+      {/* ١) لمحة المهام + لافتة اليوم الفائت — أعلى الصفحة قبل بطاقات المواد */}
+      <TasksGlance />
 
-      {activeTab === 'tasks' ? (
-        <TasksPanel />
-      ) : (
-      <>
+      {/* ٢) بطاقات المواد/المسارات وخطواتها */}
       {paths.length === 0 ? (
         <Card>
           <EmptyState icon="📚">{M.empty}</EmptyState>
@@ -194,22 +225,24 @@ export function MyPlanPage() {
                   </div>
                 </div>
 
-                <div className="myplan-progress-block">
-                  <div className="myplan-progress-bar-bg" aria-hidden="true">
-                    <div
-                      className="myplan-progress-bar-fill"
-                      style={{ width: `${percent}%` }}
-                    />
+                {progress.total > 0 && (
+                  <div className="myplan-progress-block">
+                    <div className="myplan-progress-bar-bg" aria-hidden="true">
+                      <div
+                        className="myplan-progress-bar-fill"
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                    <div className="myplan-progress-meta">
+                      <span className="muted text-xs">
+                        {M.progress
+                          .replace('{done}', String(progress.done))
+                          .replace('{total}', String(progress.total))
+                          .replace('{percent}', String(percent))}
+                      </span>
+                    </div>
                   </div>
-                  <div className="myplan-progress-meta">
-                    <span className="muted text-xs">
-                      {M.progress
-                        .replace('{done}', String(progress.done))
-                        .replace('{total}', String(progress.total))
-                        .replace('{percent}', String(percent))}
-                    </span>
-                  </div>
-                </div>
+                )}
 
                 <div className="myplan-last-stop">
                   <span className="myplan-label text-xs muted">{M.whereIStopped}</span>{' '}
@@ -224,7 +257,10 @@ export function MyPlanPage() {
                   )}
                 </div>
 
-                {pathNext ? (
+                {progress.total === 0 ? (
+                  // لا خطوات بعد — ليس «أنجزتِ كل شيء»
+                  <p className="myplan-label text-xs">{M.noStepsYet}</p>
+                ) : pathNext ? (
                   <div className="myplan-next-action-box">
                     <div className="myplan-next-details">
                       <span className="myplan-label text-xs muted">{M.nextAction}</span>
@@ -235,6 +271,7 @@ export function MyPlanPage() {
                             {M.durationChip.replace('{minutes}', String(pathNext.estimatedDuration))}
                           </Chip>
                         )}
+                        {pathNext.deadline && <ItemDeadlineChip item={pathNext} />}
                         {isNextActive && (
                           <span className="myplan-active-indicator" role="status">
                             {M.inProgressIndicator}
@@ -285,11 +322,51 @@ export function MyPlanPage() {
                                 <span className="myplan-item-status-icon">
                                   {item.status === 'done' ? '✓' : isItemActive ? '⏳' : '○'}
                                 </span>
-                                <span className="myplan-item-title">{item.title}</span>
+                                {editingItem?.id === item.id ? (
+                                  <input
+                                    className="text-input"
+                                    value={editingItem.value}
+                                    autoFocus
+                                    aria-label={voice.common.edit}
+                                    onChange={(e) => setEditingItem({ id: item.id, value: e.target.value })}
+                                    onBlur={() => void saveItemTitle(item.id)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') void saveItemTitle(item.id);
+                                      if (e.key === 'Escape') setEditingItem(null);
+                                    }}
+                                  />
+                                ) : (
+                                  <span
+                                    className="myplan-item-title"
+                                    role="button"
+                                    tabIndex={0}
+                                    style={{ cursor: 'pointer' }}
+                                    title={voice.common.edit}
+                                    onClick={() => setEditingItem({ id: item.id, value: item.title })}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        setEditingItem({ id: item.id, value: item.title });
+                                      }
+                                    }}
+                                  >
+                                    {item.title}
+                                  </span>
+                                )}
                                 {item.estimatedDuration && (
                                   <span className="muted text-xs">
                                     {M.durationChip.replace('{minutes}', String(item.estimatedDuration))}
                                   </span>
+                                )}
+                                <ItemDeadlineChip item={item} />
+                                {item.status !== 'done' && (
+                                  <Button
+                                    size="sm"
+                                    variant="soft"
+                                    onClick={() => void completeItem(item.id)}
+                                    title={M.markItemDone}
+                                  >
+                                    تم
+                                  </Button>
                                 )}
                                 {item.status !== 'done' && !isItemActive && (
                                   <Button
@@ -300,6 +377,34 @@ export function MyPlanPage() {
                                   >
                                     ⏱
                                   </Button>
+                                )}
+                                {confirmDeleteItem === item.id ? (
+                                  <>
+                                    <span className="muted text-xs">{M.deleteItemConfirm}</span>
+                                    <Button
+                                      size="sm"
+                                      variant="danger"
+                                      onClick={() => void handleDeleteItem(item.id)}
+                                    >
+                                      {voice.common.delete}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => setConfirmDeleteItem(null)}
+                                    >
+                                      {voice.common.cancel}
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <button
+                                    className="task-delete"
+                                    aria-label={voice.common.delete}
+                                    title={voice.common.delete}
+                                    onClick={() => setConfirmDeleteItem(item.id)}
+                                  >
+                                    ×
+                                  </button>
                                 )}
                               </li>
                             );
@@ -404,8 +509,11 @@ export function MyPlanPage() {
           <Button variant="soft" onClick={() => setShowAddPath(true)}>＋ {L.addPathTitle}</Button>
         </div>
       )}
-      </>
-      )}
+
+      {/* ٣) المهام المباشرة — قسم مستقل عن المواد («أُنجزت» مطوية داخله) */}
+      <div id="direct-tasks">
+        <TasksPanel />
+      </div>
     </section>
   );
 }
@@ -415,6 +523,8 @@ function ItemForm({ pathId, nextOrder, onDone }: { pathId: string; nextOrder: nu
   const addItem = useLearningStore((s) => s.addItem);
   const [title, setTitle] = useState('');
   const [duration, setDuration] = useState(30);
+  /** الموعد النهائي الاختياري — ظهيرةً محليًّا كما في المهام (لا إزاحة يوم) */
+  const [deadline, setDeadline] = useState('');
 
   const submit = async () => {
     const value = title.trim();
@@ -424,10 +534,12 @@ function ItemForm({ pathId, nextOrder, onDone }: { pathId: string; nextOrder: nu
       title: value,
       order: nextOrder,
       status: 'todo',
-      estimatedDuration: duration
+      estimatedDuration: duration,
+      deadline: deadline ? new Date(`${deadline}T12:00:00`).toISOString() : undefined
     } as Omit<PathItem, 'id' | 'createdAt' | 'updatedAt'>);
     setTitle('');
     setDuration(30);
+    setDeadline('');
     onDone();
   };
 
@@ -456,6 +568,21 @@ function ItemForm({ pathId, nextOrder, onDone }: { pathId: string; nextOrder: nu
             onChange={(e) => setDuration(Math.max(5, parseInt(e.target.value, 10) || 5))}
           />
         </div>
+        <div className="form-field" style={{ minWidth: 150, maxWidth: 200 }}>
+          <input
+            className="text-input"
+            type="date"
+            title={M.itemDeadline}
+            aria-label={M.itemDeadline}
+            value={deadline}
+            onChange={(e) => setDeadline(e.target.value)}
+          />
+        </div>
+        {deadline && (
+          <Button variant="ghost" size="sm" onClick={() => setDeadline('')}>
+            {M.clearDeadline}
+          </Button>
+        )}
         <Button variant="soft" onClick={() => void submit()}>
           {L.addItem}
         </Button>

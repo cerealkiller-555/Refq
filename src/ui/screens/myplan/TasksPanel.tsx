@@ -1,7 +1,9 @@
 // ============================================================
-// رِفق — لوحة المهام (TasksPanel) — تبويب «📋 المهام» داخل خطتي
-// مستخرعة من شاشة التخطيط: لمحة سريعة، لافتة اليوم الفائت،
-// إضافة مهمة سطر واحد + تفاصيل مخفية، القوائم المفتوحة، و"أُنجزت".
+// رِفق — المهام المباشرة داخل «خطتي» الموحّدة — تصديران:
+//  • TasksGlance: لمحة سريعة + لافتة «يوم فائت» + لافتة إعادة التوزيع
+//    (تُعرض أعلى الصفحة قبل بطاقات المواد).
+//  • TasksPanel: مهمة جديدة (سطر واحد + تفاصيل مخفية)، القائمة المفتوحة،
+//    و«أُنجزت» المطوية (يُعرض أسفل بطاقات المواد).
 // التقويم (يوم/أسبوع/شهر) بقي مستقلًا في PlanningPage.
 // ============================================================
 
@@ -21,6 +23,7 @@ import type { TaskRecord, EnergyLevel } from '../../../core/types';
 
 const cal = voice.planning.calendar;
 const glance = voice.planning.glance;
+const M = voice.myPlan;
 
 const EMPTY_FORM = {
   title: '',
@@ -31,35 +34,21 @@ const EMPTY_FORM = {
   energy: '' as EnergyLevel | ''
 };
 
-export function TasksPanel() {
+/** لمحة المهام ولافتات التعافي — قراءة فقط، وبلا أي إجراء تلقائي */
+export function TasksGlance() {
   const tasks = usePlanningStore((s) => s.tasks);
   const events = usePlanningStore((s) => s.events);
   const load = usePlanningStore((s) => s.load);
-  const addTask = usePlanningStore((s) => s.addTask);
-  const updateTask = usePlanningStore((s) => s.updateTask);
-  const deleteTask = usePlanningStore((s) => s.deleteTask);
-  const markTaskDone = usePlanningStore((s) => s.markTaskDone);
-  const reopenTask = usePlanningStore((s) => s.reopenTask);
-  const scheduleTask = usePlanningStore((s) => s.scheduleTask);
   const replan = usePlanningStore((s) => s.replan);
   const replanResult = usePlanningStore((s) => s.replanResult);
   const clearReplanResult = usePlanningStore((s) => s.clearReplanResult);
 
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
-  const [scheduling, setScheduling] = useState<string | null>(null);
-  const [schedDate, setSchedDate] = useState(todayKey());
-  const [schedTime, setSchedTime] = useState('10:00');
-  const [showDetails, setShowDetails] = useState(false);
-  const [showDone, setShowDone] = useState(false);
-
   useEffect(() => {
-    void load();
+    // قاعدة مغلقة/خطأ ← نكمل بلا انهيار (نفس عُرف تبويب اليوم)
+    void load().catch(() => {});
   }, [load]);
 
   const open = rankTasks(tasks).map((entry) => entry.task);
-  const done = tasks.filter((t) => t.status === 'done');
   const overdue = findOverdueScheduledTasks(tasks, todayKey());
 
   // ===== لمحة سريعة: أرقام تعطي اتجاهًا فوريًا بلا توهان =====
@@ -78,27 +67,6 @@ export function TasksPanel() {
     for (const list of byDay.values()) for (const occ of list) seen.add(`${occ.event.id}-${occ.start}`);
     return seen.size;
   }, [events, weekStart]);
-
-  const submit = async () => {
-    const title = form.title.trim();
-    if (!title) return;
-    await addTask({
-      title,
-      importance: form.importance,
-      urgency: form.urgency,
-      estimatedDuration: form.duration,
-      status: 'todo',
-      deadline: form.deadline ? new Date(`${form.deadline}T12:00:00`).toISOString() : undefined,
-      energyRequired: form.energy ? (form.energy as EnergyLevel) : undefined
-    } as Omit<TaskRecord, 'id' | 'createdAt' | 'updatedAt'>);
-    setForm(EMPTY_FORM);
-  };
-
-  const saveEdit = async (id: string) => {
-    const value = editValue.trim();
-    if (value) await updateTask(id, { title: value });
-    setEditingId(null);
-  };
 
   return (
     <>
@@ -138,7 +106,61 @@ export function TasksPanel() {
           <Button variant="ghost" onClick={clearReplanResult}>{cal.recovery.dismiss}</Button>
         </div>
       )}
+    </>
+  );
+}
 
+/** المهام المباشرة: إضافة، القائمة المفتوحة، و«أُنجزت» — بلا تبويب خاص */
+export function TasksPanel() {
+  const tasks = usePlanningStore((s) => s.tasks);
+  const load = usePlanningStore((s) => s.load);
+  const addTask = usePlanningStore((s) => s.addTask);
+  const updateTask = usePlanningStore((s) => s.updateTask);
+  const deleteTask = usePlanningStore((s) => s.deleteTask);
+  const markTaskDone = usePlanningStore((s) => s.markTaskDone);
+  const reopenTask = usePlanningStore((s) => s.reopenTask);
+  const scheduleTask = usePlanningStore((s) => s.scheduleTask);
+
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [scheduling, setScheduling] = useState<string | null>(null);
+  const [schedDate, setSchedDate] = useState(todayKey());
+  const [schedTime, setSchedTime] = useState('10:00');
+  const [showDetails, setShowDetails] = useState(false);
+  const [showDone, setShowDone] = useState(false);
+
+  useEffect(() => {
+    // قاعدة مغلقة/خطأ ← نكمل بلا انهيار (نفس عُرف تبويب اليوم)
+    void load().catch(() => {});
+  }, [load]);
+
+  const open = rankTasks(tasks).map((entry) => entry.task);
+  const done = tasks.filter((t) => t.status === 'done');
+
+  const submit = async () => {
+    const title = form.title.trim();
+    if (!title) return;
+    await addTask({
+      title,
+      importance: form.importance,
+      urgency: form.urgency,
+      estimatedDuration: form.duration,
+      status: 'todo',
+      deadline: form.deadline ? new Date(`${form.deadline}T12:00:00`).toISOString() : undefined,
+      energyRequired: form.energy ? (form.energy as EnergyLevel) : undefined
+    } as Omit<TaskRecord, 'id' | 'createdAt' | 'updatedAt'>);
+    setForm(EMPTY_FORM);
+  };
+
+  const saveEdit = async (id: string) => {
+    const value = editValue.trim();
+    if (value) await updateTask(id, { title: value });
+    setEditingId(null);
+  };
+
+  return (
+    <>
       {/* مهمة جديدة — سطر واحد، والتفاصيل مخفية عند الطلب */}
       <Card title={voice.planning.addTitle} icon="➕">
         <div className="add-form">
@@ -232,7 +254,7 @@ export function TasksPanel() {
 
 
       {/* المهام المفتوحة */}
-      <Card title={`${voice.planning.tasksTitle} (${open.length})`}>
+      <Card title={`${M.directTasksTitle} (${open.length})`}>
         {open.length === 0 ? (
           <EmptyState>{voice.planning.empty}</EmptyState>
         ) : (

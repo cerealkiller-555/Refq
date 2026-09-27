@@ -229,9 +229,11 @@ export const voice = {
     noPreviousSession: 'بداية الرحلة — لم تسجلي جلسات بعد',
     nextAction: 'خطوتك التالية:',
     startSession: 'ابدئي جلسة',
+    markItemDone: 'أنجزت هذه الخطوة',
     continueSession: 'مستمرة الآن',
     inProgressIndicator: 'شغّالة عليها الآن ⏳',
     allDone: 'أتممتِ كل خطوات هذه المادة بارك الله فيكِ 🌸',
+    noStepsYet: 'لا خطوات بعد — أضيفي أول خطوة بزر «＋ إضافة»',
     sessionsTotal: '{count} جلسات مسجلة',
     deletePathConfirm: 'حذف المسار وكل خطواته نهائيًا؟',
     durationChip: '{minutes} د',
@@ -239,7 +241,15 @@ export const voice = {
     collapseItems: 'طي الخطوات',
     activeTag: 'نشط',
     pausedTag: 'موقوف مؤقتًا',
-    completedTag: 'مكتمل'
+    completedTag: 'مكتمل',
+    // ===== الموعد النهائي للخطوة =====
+    itemDeadline: 'الموعد النهائي للخطوة (اختياري)',
+    clearDeadline: 'بلا موعد',
+    dueChip: 'النهاية {date}',
+    overdueChip: 'متأخرة',
+    // ===== المهام المباشرة (بلا مادة) =====
+    directTasksTitle: 'مهام مباشرة',
+    deleteItemConfirm: 'حذف الخطوة؟'
   },
 
   activeTask: {
