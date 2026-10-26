@@ -21,7 +21,7 @@ interface LearningState {
   itemsByPath: Record<string, PathItem[]>;
   sessions: Session[];
   load: () => Promise<void>;
-  addPath: (path: Omit<LearningPath, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  addPath: (path: Omit<LearningPath, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
   setPathStatus: (id: string, status: LearningPath['status']) => Promise<void>;
   deletePath: (id: string) => Promise<void>;
   addItem: (item: Omit<PathItem, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
@@ -78,8 +78,9 @@ export const useLearningStore = create<LearningState>((set, get) => ({
   },
 
   addPath: async (path) => {
-    await learningPathRepository.create(path as LearningPath);
+    const created = await learningPathRepository.create(path as LearningPath);
     await get().load();
+    return created.id;
   },
 
   setPathStatus: async (id, status) => {
