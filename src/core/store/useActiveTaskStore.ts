@@ -190,8 +190,7 @@ export const useActiveTaskStore = create<ActiveTaskState>((set, get) => {
         await taskRepository.update(id, { status: 'in_progress' });
       }
       const timer = setTimerFor(id, minutes);
-      set({ hidden: false, timer, pending: null });
-      await get().load();
+      set({ hidden: false, timer, pending: null, active: { id, kind, title } });
     },
 
     confirmReplace: async () => {

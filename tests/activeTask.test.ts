@@ -507,8 +507,8 @@ describe('قناة التعلّم من الشريط (الكاتب الوحيد: 
     const spy = vi.spyOn(taskRepository, 'getOpenTasks');
     try {
       await useActiveTaskStore.getState().startItem(id, 'learning', 'خطوة بقراءة واحدة', 25);
-      // الشريط يقرأ بنفسه بعد البدء مرة واحدة — إشعار عمليته لا يُعيد القراءة
-      expect(spy).toHaveBeenCalledTimes(1);
+      // الشريط يضبط النشط مباشرة دون قراءة مكرّرة من DB — لا تحميلان لنفس العملية
+      expect(spy).toHaveBeenCalledTimes(0);
     } finally {
       spy.mockRestore();
     }
