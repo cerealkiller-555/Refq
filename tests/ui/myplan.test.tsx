@@ -480,3 +480,30 @@ describe('MyPlanPage UI — إنجاز الخطوات من الصف (P0-2)', () 
   });
 });
 
+
+describe('MyPlanPage — startItem يحفظ العنصر النشط (ريجرشن)', () => {
+  it('بعد startItem يبقى useActiveTaskStore.active غير null ويطابق الخطوة التي بدأناها', async () => {
+    const p = await learningPathRepository.create(makePath({ id: 'p-reg-start', title: 'مسار الريجرشن' }));
+    const only = await pathItemRepository.create(
+      makeItem({ pathId: p.id, id: 'i-reg-start', title: 'الخطوة النشطة', order: 0, estimatedDuration: 30 })
+    );
+
+    // بدء الجلسة عبر زر «ابدئي جلسة» داخل البطاقة
+    renderAt();
+    expect(await screen.findByRole('heading', { name: 'مسار الريجرشن' })).toBeDefined();
+    const heading = await screen.findByRole('heading', { name: 'مسار الريجرشن' });
+    const card = heading.closest('section') as HTMLElement;
+    await userEvent.click(await within(card).findByRole('button', { name: /ابدئي جلسة/ }));
+    await waitFor(() => {
+      expect(useActiveTaskStore.getState().active?.id).toBe(only.id);
+    });
+
+    // التحقق من الانتقال: فشل إعادة التحميل لا يعيد active إلى null
+    expect(useActiveTaskStore.getState().active).not.toBeNull();
+    expect(useActiveTaskStore.getState().active?.id).toBe(only.id);
+    expect(useActiveTaskStore.getState().active?.kind).toBe('learning');
+    expect(useActiveTaskStore.getState().active?.title).toBe('الخطوة النشطة');
+    // المؤقت مرتبط بالعنصر الصحيح
+    expect(useActiveTaskStore.getState().timer?.id).toBe(only.id);
+  });
+});
