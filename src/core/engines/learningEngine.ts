@@ -4,7 +4,7 @@
 // بلا UI، بلا Dexie — فقط ترتيب وحساب.
 // ============================================================
 
-import type { LearningPath, PathItem } from '../types';
+import type { LearningPath, PathItem, Session } from '../types';
 import { pathItemToSuggestable, type Suggestable } from './suggestionEngine';
 
 export interface NextStep {
@@ -62,6 +62,72 @@ export function nextSteps(
     if (a.path.order !== b.path.order) return a.path.order - b.path.order;
     return a.item.id.localeCompare(b.item.id);
   });
+}
+
+/** آخر توقف لكل مسار: أحدث جلسة فعلية إن وجدت، وإلا آخر خطوة مُنجزة، وإلا لا شيء.
+ *  (نفس القاعدة التي كانت في واجهة خطتي — نُقلت هنا لتكون نقية وقابلة للاختبار) */
+export interface LastStop {
+  itemTitle: string;
+  date: string;
+}
+
+export function lastStopByPath(
+  paths: LearningPath[],
+  itemsByPath: Record<string, PathItem[]>,
+  sessions: Session[]
+): Map<string, LastStop | null> {
+  const map = new Map<string, LastStop | null>();
+  const sessionMap = new Map<string, Session[]>();
+
+  for (const session of sessions) {
+    const list = sessionMap.get(session.pathItemId) || [];
+    list.push(session);
+    sessionMap.set(session.pathItemId, list);
+  }
+
+  for (const p of paths) {
+    const pItems = itemsByPath[p.id] || [];
+    const itemMap = new Map(pItems.map((it) => [it.id, it]));
+
+    let latestSession: Session | null = null;
+    for (const item of pItems) {
+      const itemSessions = sessionMap.get(item.id) || [];
+      for (const s of itemSessions) {
+        if (!latestSession || new Date(s.date).getTime() > new Date(latestSession.date).getTime()) {
+          latestSession = s;
+        }
+      }
+    }
+
+    if (latestSession && itemMap.has(latestSession.pathItemId)) {
+      map.set(p.id, {
+        itemTitle: itemMap.get(latestSession.pathItemId)!.title,
+        date: latestSession.date
+      });
+    } else {
+      const doneItems = pItems.filter((i) => i.status === 'done').sort((a, b) => b.order - a.order);
+      if (doneItems.length > 0) {
+        map.set(p.id, {
+          itemTitle: doneItems[0].title,
+          date: doneItems[0].updatedAt
+        });
+      } else {
+        map.set(p.id, null);
+      }
+    }
+  }
+  return map;
+}
+
+/** عدّاد جلسات المسار الواحد — يُحسب من الجلسات الموجودة فعلًا */
+export function pathSessionsCount(items: PathItem[], sessions: Session[]): number {
+  if (items.length === 0 || sessions.length === 0) return 0;
+  const ids = new Set(items.map((it) => it.id));
+  let count = 0;
+  for (const s of sessions) {
+    if (ids.has(s.pathItemId)) count += 1;
+  }
+  return count;
 }
 
 /** تقدم المسار: عدد مُنجز / إجمالي (للعرض بلطف، بلا أي تقييم) */

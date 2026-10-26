@@ -16,7 +16,7 @@ import {
   sessionRepository,
   taskRepository
 } from '../src/core/db/repositories';
-import { nextSteps, pathProgress } from '../src/core/engines/learningEngine';
+import { lastStopByPath, nextSteps, pathProgress, pathSessionsCount } from '../src/core/engines/learningEngine';
 import { pathItemToSuggestable, isLearningItem } from '../src/core/engines/suggestionEngine';
 import { useLearningStore } from '../src/core/store/useLearningStore';
 import { useTodayStore } from '../src/core/store/useTodayStore';
@@ -116,6 +116,36 @@ describe('learningEngine', () => {
       makeItem({ pathId: 'p' })
     ];
     expect(pathProgress(items)).toEqual({ done: 2, total: 3 });
+  });
+
+  it('lastStopByPath: أحدث جلسة فعلية ثم آخر مُنجزة ثم لا شيء', () => {
+    const p = makePath({ id: 'p-stop' });
+    const i1 = makeItem({ pathId: p.id, id: 'i1', order: 0, title: 'خطوة أولى', status: 'done', updatedAt: '2026-01-05T08:00:00.000Z' });
+    const i2 = makeItem({ pathId: p.id, id: 'i2', order: 1, title: 'خطوة ثانية' });
+    // بلا جلسات → آخر مُنجزة
+    expect(lastStopByPath([p], { [p.id]: [i1, i2] }, []).get(p.id)).toEqual({
+      itemTitle: 'خطوة أولى',
+      date: '2026-01-05T08:00:00.000Z'
+    });
+    // أحدث جلسة فعلية تتقدم — وإن كانت على خطوة غير مُنجزة
+    const sessions = [
+      { id: 's1', pathItemId: 'i1', date: '2026-01-06T08:00:00.000Z', durationMinutes: 20, createdAt: '2026-01-06T08:00:00.000Z', updatedAt: '2026-01-06T08:00:00.000Z' },
+      { id: 's2', pathItemId: 'i2', date: '2026-01-09T08:00:00.000Z', durationMinutes: 30, createdAt: '2026-01-09T08:00:00.000Z', updatedAt: '2026-01-09T08:00:00.000Z' }
+    ];
+    expect(lastStopByPath([p], { [p.id]: [i1, i2] }, sessions as never).get(p.id)).toEqual({
+      itemTitle: 'خطوة ثانية',
+      date: '2026-01-09T08:00:00.000Z'
+    });
+    // جلسة لخطوة محذوفة تُتجاهل — والمسار الفارغ بلا توقف
+    expect(lastStopByPath([p], { [p.id]: [i1, i2] }, [{ id: 'sx', pathItemId: 'ghost', date: '2026-01-20T08:00:00.000Z', durationMinutes: 5, createdAt: '2026-01-20T08:00:00.000Z', updatedAt: '2026-01-20T08:00:00.000Z' }] as never).get(p.id)).toEqual({
+      itemTitle: 'خطوة أولى',
+      date: '2026-01-05T08:00:00.000Z'
+    });
+    expect(lastStopByPath([p], { [p.id]: [] }, []).get(p.id)).toBeNull();
+    // عدّاد الجلسات: الموجودة فعلًا فقط وبزمن ثابت
+    expect(pathSessionsCount([i1, i2], sessions as never)).toBe(2);
+    expect(pathSessionsCount([], sessions as never)).toBe(0);
+    expect(pathSessionsCount([i1, i2], [])).toBe(0);
   });
 
   it('pathItemToSuggestable يحمل نوع learning واسم المسار والموعد', () => {

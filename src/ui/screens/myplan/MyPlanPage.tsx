@@ -9,11 +9,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLearningStore } from '../../../core/store/useLearningStore';
 import { useActiveTaskStore } from '../../../core/store/useActiveTaskStore';
-import { nextSteps, pathProgress } from '../../../core/engines/learningEngine';
+import { lastStopByPath, nextSteps, pathProgress, pathSessionsCount } from '../../../core/engines/learningEngine';
 import { dateKey, todayKey } from '../../../core/engines/calendarEngine';
 import { voice } from '../../../i18n/voice';
 import { Card, Button, Chip, EmptyState } from '../../components';
-import type { LearningPath, LearningPathType, PathItem, Session } from '../../../core/types';
+import type { LearningPath, LearningPathType, PathItem } from '../../../core/types';
 
 const M = voice.myPlan;
 const L = voice.learning;
@@ -73,46 +73,15 @@ export function MyPlanPage() {
     return nextSteps(paths, itemsByPath);
   }, [paths, itemsByPath]);
 
-  const lastStopByPath = useMemo(() => {
-    const map = new Map<string, { itemTitle: string; date: string } | null>();
-    const sessionMap = new Map<string, Session[]>();
+  const stopMap = useMemo(() => {
+    return lastStopByPath(paths, itemsByPath, sessions);
+  }, [paths, itemsByPath, sessions]);
 
-    for (const session of sessions) {
-      const list = sessionMap.get(session.pathItemId) || [];
-      list.push(session);
-      sessionMap.set(session.pathItemId, list);
-    }
-
+  /** عدّادات الجلسات لكل مسار — O(paths+sessions) بدل مرشّح متداخل في كل بطاقة */
+  const sessionsCountMap = useMemo(() => {
+    const map = new Map<string, number>();
     for (const p of paths) {
-      const pItems = itemsByPath[p.id] || [];
-      const itemMap = new Map(pItems.map((it) => [it.id, it]));
-
-      let latestSession: Session | null = null;
-      for (const item of pItems) {
-        const itemSessions = sessionMap.get(item.id) || [];
-        for (const s of itemSessions) {
-          if (!latestSession || new Date(s.date).getTime() > new Date(latestSession.date).getTime()) {
-            latestSession = s;
-          }
-        }
-      }
-
-      if (latestSession && itemMap.has(latestSession.pathItemId)) {
-        map.set(p.id, {
-          itemTitle: itemMap.get(latestSession.pathItemId)!.title,
-          date: latestSession.date
-        });
-      } else {
-        const doneItems = pItems.filter((i) => i.status === 'done').sort((a, b) => b.order - a.order);
-        if (doneItems.length > 0) {
-          map.set(p.id, {
-            itemTitle: doneItems[0].title,
-            date: doneItems[0].updatedAt
-          });
-        } else {
-          map.set(p.id, null);
-        }
-      }
+      map.set(p.id, pathSessionsCount(itemsByPath[p.id] || [], sessions));
     }
     return map;
   }, [paths, itemsByPath, sessions]);
@@ -160,6 +129,59 @@ export function MyPlanPage() {
         <p className="screen-subtitle muted">{M.subtitle}</p>
       </header>
 
+      {/* الخطوة التالية الآن — قرار واحد أعلى الصفحة من نفس محرك الاقتراح */}
+      {paths.length > 0 && (
+        <Card className="myplan-next-now-card" title={M.nextNowTitle}>
+          {globalNextSteps.length === 0 ? (
+            <p className="myplan-label text-xs">{M.nextNowEmpty}</p>
+          ) : (
+            <>
+              <div className="myplan-next-now-row">
+                <div className="myplan-next-now-details">
+                  <span className="myplan-label text-xs muted">{M.nextNowTitle}</span>
+                  <div className="myplan-next-title-row">
+                    <span className="myplan-next-title font-medium">
+                      {globalNextSteps[0].item.title}
+                    </span>
+                    <Chip>{globalNextSteps[0].path.title}</Chip>
+                    {globalNextSteps[0].item.estimatedDuration && (
+                      <Chip>
+                        {M.durationChip.replace('{minutes}', String(globalNextSteps[0].item.estimatedDuration))}
+                      </Chip>
+                    )}
+                    {globalNextSteps[0].item.deadline && (
+                      <ItemDeadlineChip item={globalNextSteps[0].item} />
+                    )}
+                  </div>
+                </div>
+                <div className="myplan-action-btn-wrap">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() =>
+                      void handleStartSession(globalNextSteps[0].item)
+                    }
+                  >
+                    {`⏱ ${M.startSession}`}
+                  </Button>
+                </div>
+              </div>
+              {globalNextSteps.length > 1 && (
+                <p className="myplan-label text-xs muted">
+                  {M.nextNowOthers.replace(
+                    '{list}',
+                    globalNextSteps
+                      .slice(1, 4)
+                      .map((ns) => `«${ns.item.title}» (${ns.path.title})`)
+                      .join(' · ')
+                  )}
+                </p>
+              )}
+            </>
+          )}
+        </Card>
+      )}
+
       {/* بطاقات المواد/المسارات وخطواتها */}
       {paths.length === 0 ? (
         <Card>
@@ -171,15 +193,15 @@ export function MyPlanPage() {
             const items = itemsByPath[path.id] || [];
             const progress = pathProgress(items);
             const percent = progress.total === 0 ? 0 : Math.round((progress.done / progress.total) * 100);
-            const pathSessionsCount = items.reduce(
-              (acc, it) => acc + sessions.filter((s) => s.pathItemId === it.id).length,
-              0
-            );
+            const pathSessionsCount = sessionsCountMap.get(path.id) ?? 0;
 
-            const pathNext = globalNextSteps.find((ns) => ns.path.id === path.id)?.item ||
+            // الخطوة التالية للبطاقة: من المحرك للنشط، وبديل محلي للموقوف/غير المنجز
+            // (nextSteps يستبعد غير النشط؛ هذا البديل للعرض فقط ولا يمس الاقتراحات)
+            const pathNext =
+              globalNextSteps.find((ns) => ns.path.id === path.id)?.item ??
               items.filter((i) => i.status !== 'done').sort((a, b) => a.order - b.order)[0];
 
-            const lastStop = lastStopByPath.get(path.id);
+            const lastStop = stopMap.get(path.id);
             const isPathExpanded = !!expandedPaths[path.id];
             const isNextActive = activeTask?.kind === 'learning' && activeTask.id === pathNext?.id;
 
@@ -227,7 +249,10 @@ export function MyPlanPage() {
                   <span className="myplan-label text-xs muted">{M.whereIStopped}</span>{' '}
                   {lastStop ? (
                     <span className="myplan-stop-value font-medium">
-                      «{lastStop.itemTitle}»
+                      «{lastStop.itemTitle}»{' '}
+                      <span className="muted text-xs">
+                        {M.lastStopDate.replace('{date}', dateKey(new Date(lastStop.date)))}
+                      </span>
                     </span>
                   ) : (
                     <span className="myplan-stop-empty muted text-xs">

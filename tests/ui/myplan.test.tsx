@@ -98,14 +98,16 @@ describe('MyPlanPage UI — خطتي', () => {
 
     renderAt();
 
-    expect(await screen.findByText('تفسير جزء عم')).toBeDefined();
+    expect(await screen.findByRole('heading', { name: 'تفسير جزء عم' })).toBeDefined();
     // نسبة الإنجاز: 1 من 2 (50%)
     expect(screen.getByText(/أُنجز 1 من 2/)).toBeDefined();
     // آخر توقف
     expect(screen.getByText(/«سورة النبأ»/)).toBeDefined();
-    // الخطوة التالية
-    expect(screen.getByText('سورة النازعات')).toBeDefined();
-    expect(screen.getByText('25 د')).toBeDefined();
+    // الخطوة التالية (scoped to the path card, not the global next-now banner)
+    const card = screen.getByRole('heading', { name: 'تفسير جزء عم' });
+    const cardEl = card.closest('.myplan-subject-card') as HTMLElement;
+    expect(within(cardEl).getByText('سورة النازعات')).toBeDefined();
+    expect(within(cardEl).getByText('25 د')).toBeDefined();
   });
 
   it('الضغط على «ابدئي جلسة» يطلق الجلسة في useActiveTaskStore', async () => {
@@ -116,8 +118,10 @@ describe('MyPlanPage UI — خطتي', () => {
     renderAt();
 
     // انتظر تحميل المسار أولًا (load() في useEffect أبطأ من مهلة findByRole الافتراضية)
-    expect(await screen.findByText('نظم المعلومات', {}, { timeout: 5000 })).toBeDefined();
-    const startBtn = await screen.findByRole('button', { name: /ابدئي جلسة/ }, { timeout: 5000 });
+    const heading = await screen.findByRole('heading', { name: 'نظم المعلومات' }, { timeout: 5000 });
+    const cardEl = heading.closest('.myplan-subject-card') as HTMLElement;
+    // الزر في البطاقة (ليس في البانر العالمي للخطوة الآن)
+    const startBtn = await within(cardEl).findByRole('button', { name: /ابدئي جلسة/ });
     await user.click(startBtn);
 
     await waitFor(() => {
@@ -139,6 +143,9 @@ describe('MyPlanPage UI — خطتي', () => {
     await pathItemRepository.create(makeItem({ pathId: p.id, title: 'أساسيات CSS', order: 1, status: 'todo' }));
 
     renderAt();
+
+    // انتظر ظهور بطاقة المادة قبل التفاعل (load() في useEffect غير متزامن)
+    expect(await screen.findByRole('heading', { name: 'برمجة الويب' })).toBeDefined();
 
     const toggleBtn = await screen.findByRole('button', { name: /عرض كل الخطوات/ });
     await user.click(toggleBtn);
@@ -253,7 +260,7 @@ describe('MyPlanPage — بلا أي تجربة Direct Tasks', () => {
     const step = await pathItemRepository.create(makeItem({ pathId: p.id, title: 'عنوان قديم', order: 0 }));
 
     renderAt();
-    expect(await screen.findByText('مسار الصف')).toBeDefined();
+    expect(await screen.findByRole('heading', { name: 'مسار الصف' })).toBeDefined();
     await user.click(await screen.findByRole('button', { name: new RegExp(M.expandItems) }));
 
     const list = await screen.findByRole('list', { name: 'مسار الصف' });
@@ -297,7 +304,7 @@ describe('MyPlanPage — بلا أي تجربة Direct Tasks', () => {
     expect(useActiveTaskStore.getState().active?.id).toBe(step.id);
 
     renderAt();
-    expect(await screen.findByText('مسار الحذف الجاري')).toBeDefined();
+    expect(await screen.findByRole('heading', { name: 'مسار الحذف الجاري' })).toBeDefined();
     await user.click(await screen.findByRole('button', { name: new RegExp(M.expandItems) }));
 
     const list = await screen.findByRole('list', { name: 'مسار الحذف الجاري' });
@@ -324,19 +331,19 @@ describe('MyPlan — تأكيد حذف المسار', () => {
     await pathItemRepository.create(makeItem({ pathId: p.id, title: 'خطوة واحدة', order: 0, status: 'todo' }));
 
     renderAt();
-    expect(await screen.findByText('مسار للحذف')).toBeDefined();
+    expect(await screen.findByRole('heading', { name: 'مسار للحذف' })).toBeDefined();
 
     // ضغطة واحدة = سؤال، والمسار ما زال موجودًا
     await user.click(screen.getByRole('button', { name: voice.common.delete }));
     expect(await screen.findByText(M.deletePathConfirm)).toBeDefined();
-    expect(screen.getByText('مسار للحذف')).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'مسار للحذف' })).toBeDefined();
 
     // الإلغاء يبقي المسار
     await user.click(screen.getByRole('button', { name: voice.common.cancel }));
     await waitFor(() => {
       expect(screen.queryByText(M.deletePathConfirm)).toBeNull();
     });
-    expect(screen.getByText('مسار للحذف')).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'مسار للحذف' })).toBeDefined();
 
     // التأكيد = حذف حقيقي للمسار
     await user.click(screen.getByRole('button', { name: voice.common.delete }));
@@ -400,7 +407,7 @@ describe('MyPlanPage UI — إنجاز الخطوات من الصف (P0-2)', () 
     await pathItemRepository.create(makeItem({ pathId: p.id, title: 'الخطوة الثانية', order: 1 }));
 
     renderAt();
-    expect(await screen.findByText('مسار الإنجاز')).toBeDefined();
+    expect(await screen.findByRole('heading', { name: 'مسار الإنجاز' })).toBeDefined();
     await user.click(await screen.findByRole('button', { name: /عرض كل الخطوات/ }));
 
     // زر «تم» لكل خطوة غير منجزة
@@ -431,9 +438,10 @@ describe('MyPlanPage UI — إنجاز الخطوات من الصف (P0-2)', () 
     );
 
     renderAt();
-    expect(await screen.findByText('مسار الجلسة')).toBeDefined();
+    const heading = await screen.findByRole('heading', { name: 'مسار الجلسة' });
+    const cardEl = heading.closest('.myplan-subject-card') as HTMLElement;
 
-    await user.click(await screen.findByRole('button', { name: /ابدئي جلسة/ }));
+    await user.click(await within(cardEl).findByRole('button', { name: /ابدئي جلسة/ }));
     await waitFor(() => {
       expect(useActiveTaskStore.getState().active?.id).toBe(only.id);
     });
@@ -466,7 +474,7 @@ describe('MyPlanPage UI — إنجاز الخطوات من الصف (P0-2)', () 
     );
 
     renderAt();
-    expect(await screen.findByText('مسار بلا مؤقت')).toBeDefined();
+    expect(await screen.findByRole('heading', { name: 'مسار بلا مؤقت' })).toBeDefined();
 
     // إنجاز مباشر بلا مؤقت جارٍ ← لا جلسة تُخترع
     await user.click(await screen.findByRole('button', { name: /عرض كل الخطوات/ }));
