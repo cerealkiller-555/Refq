@@ -8,12 +8,13 @@
 // 5) fallback عند فشل الجلب (آخر محفوظة / بلا مراسٍ يعمل كالعادة)
 // ============================================================
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, cleanup, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TodayPage } from '../../src/ui/screens/today/TodayPage';
 import { useTodayStore } from '../../src/core/store/useTodayStore';
-import { taskRepository, calendarRepository, prayerAnchorRepository } from '../../src/core/db/repositories';
+import { useActiveTaskStore } from '../../src/core/store/useActiveTaskStore';
+import { taskRepository, calendarRepository, prayerAnchorRepository, learningPathRepository, pathItemRepository } from '../../src/core/db/repositories';
 import { db } from '../../src/core/db/schema';
 import type { TaskRecord, PrayerAnchor } from '../../src/core/types';
 import { voice } from '../../src/i18n/voice';
@@ -27,6 +28,7 @@ const initialTodayState = {
   todayEnergy: null,
   lightDay: false,
   topPriorities: [] as TaskRecord[],
+  workItems: [] as any[],
   suggestion: null,
   anchors: [] as PrayerAnchor[],
   currentPeriod: null,
@@ -39,7 +41,10 @@ beforeEach(async () => {
   useTodayStore.setState(initialTodayState);
 });
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe('TodayPage UI', () => {
   it('إضافة مهمة من الالتقاط السريع ثم ظهورها في القائمة', async () => {
@@ -208,7 +213,10 @@ describe('Today — إنجاز المهمة يحرّر أحداثها (مسار 
     useTodayStore.setState(initialTodayState);
   });
 
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
 
   it('إنجاز مهمة مجدولة من شاشة اليوم يزيل حدثها المرن من التقويم', async () => {
     const task = await taskRepository.create({
@@ -232,5 +240,167 @@ describe('Today — إنجاز المهمة يحرّر أحداثها (مسار 
       expect(await calendarRepository.getByLinkedTask(task.id)).toHaveLength(0);
     });
     expect((await taskRepository.get(task.id))?.status).toBe('done');
+  });
+});
+
+describe('TodayPage — أزرار الأولويات حسب نوع العنصر', () => {
+  it('بدء مهمة حرة يستدعي startItem(id, "task", ...)', async () => {
+    const user = userEvent.setup();
+    const task = await taskRepository.create({
+      title: 'مهمة حرة للبدء',
+      importance: 'low',
+      urgency: 'low',
+      estimatedDuration: 30,
+      status: 'todo'
+    } as Parameters<typeof taskRepository.create>[0]);
+
+    useTodayStore.setState({
+      ...initialTodayState,
+      workItems: [{
+        id: task.id,
+        kind: 'task',
+        title: task.title,
+        status: 'todo',
+        estimatedDuration: task.estimatedDuration,
+        original: task
+      } as any],
+      loaded: true
+    });
+
+    const startSpy = vi.spyOn(useActiveTaskStore.getState(), 'startItem');
+
+    render(<TodayPage />);
+    const startBtn = await screen.findByRole('button', { name: voice.today.suggestion.start });
+    await user.click(startBtn);
+
+    expect(startSpy).toHaveBeenCalledWith(task.id, 'task', task.title, task.estimatedDuration || 15);
+    startSpy.mockRestore();
+  });
+
+  it('إكمال مهمة حرة يستدعي completeTask(id)', async () => {
+    const user = userEvent.setup();
+    const task = await taskRepository.create({
+      title: 'مهمة حرة للإكمال',
+      importance: 'low',
+      urgency: 'low',
+      estimatedDuration: 30,
+      status: 'todo'
+    } as Parameters<typeof taskRepository.create>[0]);
+
+    useTodayStore.setState({
+      ...initialTodayState,
+      workItems: [{
+        id: task.id,
+        kind: 'task',
+        title: task.title,
+        status: 'todo',
+        estimatedDuration: task.estimatedDuration,
+        original: task
+      } as any],
+      loaded: true
+    });
+
+    const completeSpy = vi.spyOn(useTodayStore.getState(), 'completeTask');
+
+    render(<TodayPage />);
+    const completeBtn = await screen.findByRole('button', { name: voice.common.complete });
+    await user.click(completeBtn);
+
+    expect(completeSpy).toHaveBeenCalledWith(task.id);
+    completeSpy.mockRestore();
+  });
+
+  it('بدء خطوة تعلّم يستدعي startItem(id, "learning", ...)', async () => {
+    const user = userEvent.setup();
+    const path = await learningPathRepository.create({
+      id: 'path-btn-start',
+      title: 'مسار اختبار الزر',
+      type: 'university',
+      status: 'active',
+      order: 0,
+      createdAt: '2026-01-01T08:00:00.000Z',
+      updatedAt: '2026-01-01T08:00:00.000Z'
+    } as any);
+    const item = await pathItemRepository.create({
+      id: 'item-btn-start',
+      pathId: path.id,
+      title: 'خطوة اختبار الزر',
+      order: 0,
+      status: 'todo',
+      estimatedDuration: 20,
+      createdAt: '2026-01-01T08:00:00.000Z',
+      updatedAt: '2026-01-01T08:00:00.000Z'
+    } as any);
+
+    useTodayStore.setState({
+      ...initialTodayState,
+      workItems: [{
+        id: item.id,
+        kind: 'learning',
+        title: item.title,
+        status: 'todo',
+        estimatedDuration: item.estimatedDuration,
+        sourceLabel: path.title,
+        pathId: path.id,
+        original: item
+      } as any],
+      loaded: true
+    });
+
+    const startSpy = vi.spyOn(useActiveTaskStore.getState(), 'startItem');
+
+    render(<TodayPage />);
+    const startBtn = await screen.findByRole('button', { name: voice.today.suggestion.start });
+    await user.click(startBtn);
+
+    expect(startSpy).toHaveBeenCalledWith(item.id, 'learning', item.title, expect.any(Number));
+    startSpy.mockRestore();
+  });
+
+  it('إكمال خطوة تعلّم يستدعي completeItem(id)', async () => {
+    const user = userEvent.setup();
+    const path = await learningPathRepository.create({
+      id: 'path-btn-complete',
+      title: 'مسار اختبار الإكمال',
+      type: 'university',
+      status: 'active',
+      order: 0,
+      createdAt: '2026-01-01T08:00:00.000Z',
+      updatedAt: '2026-01-01T08:00:00.000Z'
+    } as any);
+    const item = await pathItemRepository.create({
+      id: 'item-btn-complete',
+      pathId: path.id,
+      title: 'خطوة اختبار الإكمال',
+      order: 0,
+      status: 'todo',
+      estimatedDuration: 20,
+      createdAt: '2026-01-01T08:00:00.000Z',
+      updatedAt: '2026-01-01T08:00:00.000Z'
+    } as any);
+
+    useTodayStore.setState({
+      ...initialTodayState,
+      workItems: [{
+        id: item.id,
+        kind: 'learning',
+        title: item.title,
+        status: 'todo',
+        estimatedDuration: item.estimatedDuration,
+        sourceLabel: path.title,
+        pathId: path.id,
+        original: item
+      } as any],
+      loaded: true
+    });
+
+    const completeSpy = vi.spyOn(useActiveTaskStore.getState(), 'completeItem');
+
+    render(<TodayPage />);
+    const completeBtn = await screen.findByRole('button', { name: voice.common.complete });
+    await user.click(completeBtn);
+
+    expect(completeSpy).toHaveBeenCalledWith(item.id);
+    completeSpy.mockRestore();
   });
 });

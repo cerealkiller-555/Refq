@@ -10,6 +10,11 @@ import {
   describeReason
 } from '../src/core/engines/priorityEngine';
 import { suggestTask, pathItemToSuggestable } from '../src/core/engines/suggestionEngine';
+import {
+  getWorkItems,
+  rankWorkItems,
+  describeWorkReason
+} from '../src/core/engines/workItems';
 import { recomputePlan, findOverdueScheduledTasks } from '../src/core/engines/recoveryEngine';
 import { getCurrentPeriod, getDayPeriods } from '../src/core/engines/dayPeriods';
 import {
@@ -27,7 +32,7 @@ import {
   localDateTimeISO,
   dateKey
 } from '../src/core/engines/calendarEngine';
-import type { TaskRecord, CalendarEvent, PrayerAnchor } from '../src/core/types';
+import type { TaskRecord, CalendarEvent, PrayerAnchor, LearningPath, PathItem } from '../src/core/types';
 
 function makeTask(partial: Partial<TaskRecord> = {}): TaskRecord {
   const now = new Date().toISOString();
@@ -631,5 +636,177 @@ describe('CalendarEngine — الشهر والمهام المجدولة', () => 
     expect([...byDay.keys()].sort()).toEqual(['2026-03-02', '2026-03-05']);
     expect(byDay.get('2026-03-02')!.map((t) => t.id)).toEqual(['b', 'a']);
     expect(byDay.get('2026-03-05')!.map((t) => t.id)).toEqual(['e']);
+  });
+});
+
+// ===== Work Items ====
+
+function makePath(over: Partial<LearningPath> = {}): LearningPath {
+  return {
+    id: over.id ?? 'path-1',
+    title: over.title ?? 'مادة المحاسبة',
+    type: 'university',
+    status: over.status ?? 'active',
+    order: over.order ?? 0,
+    createdAt: '2026-01-01T08:00:00.000Z',
+    updatedAt: '2026-01-01T08:00:00.000Z',
+    ...over
+  };
+}
+
+function makePathItem(over: Partial<PathItem> & { pathId: string }): PathItem {
+  const { pathId: pid, ...rest } = over;
+  return {
+    id: rest.id ?? `item-${Math.random().toString(36).slice(2, 8)}`,
+    title: rest.title ?? 'محاضرة 1',
+    order: rest.order ?? 0,
+    status: rest.status ?? 'todo',
+    estimatedDuration: rest.estimatedDuration ?? 20,
+    createdAt: '2026-01-01T08:00:00.000Z',
+    updatedAt: '2026-01-01T08:00:00.000Z',
+    ...rest,
+    pathId: pid
+  };
+}
+
+describe('WorkItems', () => {
+  const now = '2026-01-10T10:00:00.000Z';
+
+  it('تدمج المهام الحرة وخطوات المسارات دون تغيير معرّفات الأصل', () => {
+    const task = makeTask({ id: 'task-1', title: 'مهمة حرة' });
+    const path = makePath({ id: 'path-1', title: 'مسار 1' });
+    const item = makePathItem({ pathId: path.id, id: 'item-1', title: 'خطوة 1', order: 0 });
+
+    const workItems = getWorkItems([task], [path], { [path.id]: [item] });
+
+    expect(workItems).toHaveLength(2);
+    const taskItem = workItems.find((w) => w.kind === 'task');
+    const learningItem = workItems.find((w) => w.kind === 'learning');
+    expect(taskItem).toBeDefined();
+    expect(taskItem?.id).toBe('task-1');
+    expect(taskItem?.original).toBe(task);
+    expect(learningItem).toBeDefined();
+    expect(learningItem?.id).toBe('item-1');
+    expect(learningItem?.original).toBe(item);
+  });
+
+  it('يستبعد المهام المكتملة وخطوات المسار المكتملة', () => {
+    const task = makeTask({ id: 'task-1', status: 'done' });
+    const path = makePath({ id: 'path-1' });
+    const item = makePathItem({ pathId: path.id, id: 'item-1', status: 'done' });
+
+    const workItems = getWorkItems([task], [path], { [path.id]: [item] });
+
+    expect(workItems).toHaveLength(0);
+  });
+
+  it('يستبعد المسارات المتوقفة ولا يختار خطواتها', () => {
+    const task = makeTask({ id: 'task-1' });
+    const path = makePath({ id: 'path-1', status: 'paused' });
+    const item = makePathItem({ pathId: path.id, id: 'item-1' });
+
+    const workItems = getWorkItems([task], [path], { [path.id]: [item] });
+
+    expect(workItems).toHaveLength(1);
+    expect(workItems[0].kind).toBe('task');
+  });
+
+  it('يختار خطوة واحدة فقط قابلة للتنفيذ من كل مسار نشط', () => {
+    const path = makePath({ id: 'path-1' });
+    const items = [
+      makePathItem({ pathId: path.id, id: 'item-1', order: 0, title: 'أول خطوة' }),
+      makePathItem({ pathId: path.id, id: 'item-2', order: 1, title: 'ثانية خطوة' }),
+      makePathItem({ pathId: path.id, id: 'item-3', order: 2, title: 'ثالثة خطوة' })
+    ];
+
+    const workItems = getWorkItems([], [path], { [path.id]: items });
+
+    const learningItems = workItems.filter((w) => w.kind === 'learning');
+    expect(learningItems).toHaveLength(1);
+    expect(learningItems[0].id).toBe('item-1');
+    expect(learningItems[0].title).toBe('أول خطوة');
+  });
+
+  it('يحترم ترتيب الخطوات داخل المسار (أول غير منجز بالترتيب)', () => {
+    const path = makePath({ id: 'path-1' });
+    const items = [
+      makePathItem({ pathId: path.id, id: 'item-3', order: 2, status: 'done', title: 'منجزة' }),
+      makePathItem({ pathId: path.id, id: 'item-1', order: 0, status: 'todo', title: 'الأولى' }),
+      makePathItem({ pathId: path.id, id: 'item-2', order: 1, status: 'todo', title: 'الثانية' })
+    ];
+
+    const workItems = getWorkItems([], [path], { [path.id]: items });
+
+    const learningItems = workItems.filter((w) => w.kind === 'learning');
+    expect(learningItems).toHaveLength(1);
+    expect(learningItems[0].id).toBe('item-1');
+  });
+
+  it('لا تسقط مهمة حرة بسبب linkedPathItemId دون تحقق من العلاقة الفعلية', () => {
+    const task = makeTask({
+      id: 'task-1',
+      linkedPathItemId: 'some-item-id',
+      title: 'مهمة مرتبطة'
+    });
+    const path = makePath({ id: 'path-1' });
+    const item = makePathItem({ pathId: path.id, id: 'item-1' });
+
+    const workItems = getWorkItems([task], [path], { [path.id]: [item] });
+
+    const taskItems = workItems.filter((w) => w.kind === 'task');
+    expect(taskItems).toHaveLength(1);
+    expect(taskItems[0].id).toBe('task-1');
+  });
+
+  it('يرتب بالتعادل: in_progress أولًا، ثم تاريخ الإنشاء، ثم المعرّف', () => {
+    const base = makeTask({
+      id: 'a',
+      importance: 'low',
+      urgency: 'low',
+      createdAt: '2026-01-01T00:00:00.000Z'
+    });
+    const inProgress = makeTask({
+      id: 'c',
+      importance: 'low',
+      urgency: 'low',
+      status: 'in_progress',
+      createdAt: '2026-01-03T00:00:00.000Z'
+    });
+
+    const workItems = getWorkItems([base, inProgress], [], {});
+    const ranked = rankWorkItems(workItems, now);
+
+    expect(ranked.map((r) => r.item.id)).toEqual(['c', 'a']);
+  });
+
+  it('يرتب بالمعرّف عند التعادل التام', () => {
+    const b = makeTask({
+      id: 'b-task',
+      importance: 'low',
+      urgency: 'low',
+      createdAt: '2026-01-01T00:00:00.000Z'
+    });
+    const a = makeTask({
+      id: 'a-task',
+      importance: 'low',
+      urgency: 'low',
+      createdAt: '2026-01-01T00:00:00.000Z'
+    });
+
+    const workItems = getWorkItems([b, a], [], {});
+    const ranked = rankWorkItems(workItems, now);
+
+    expect(ranked.map((r) => r.item.id)).toEqual(['a-task', 'b-task']);
+  });
+
+  it('يعرض اسم المسار مع خطوة التعلّم في السبب', () => {
+    const path = makePath({ id: 'path-1', title: 'مادة المحاسبة' });
+    const item = makePathItem({ pathId: path.id, id: 'item-1', title: 'محاضرة 1' });
+
+    const workItems = getWorkItems([], [path], { [path.id]: [item] });
+    const learningItem = workItems.find((w) => w.kind === 'learning');
+
+    expect(learningItem?.sourceLabel).toBe('مادة المحاسبة');
+    expect(describeWorkReason(learningItem!, now)).toContain('مادة المحاسبة');
   });
 });

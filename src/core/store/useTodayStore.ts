@@ -12,7 +12,7 @@ import {
   prayerAnchorRepository,
   taskRepository
 } from '../db/repositories';
-import type { TaskRecord, EnergyLevel, PrayerAnchor } from '../types';
+import type { TaskRecord, EnergyLevel, PrayerAnchor, LearningPath, PathItem } from '../types';
 import {
   completeTask as completeTaskLifecycle,
   deleteTask as deleteTaskLifecycle,
@@ -24,6 +24,7 @@ import { useActiveTaskStore } from './useActiveTaskStore';
 import { getTopPriorities } from '../engines/priorityEngine';
 import { suggestTask, type SuggestionResult, type Suggestable } from '../engines/suggestionEngine';
 import { nextSteps } from '../engines/learningEngine';
+import { getWorkItems, type WorkItem } from '../engines/workItems';
 import { getCurrentPeriod, PRAYER_LABELS, type CurrentPeriod } from '../engines/dayPeriods';
 import { localDateKey } from '../../utils';
 import { fetchPrayerAnchors } from '../services/prayerTimesService';
@@ -34,6 +35,7 @@ interface TodayState {
   todayEnergy: EnergyLevel | null;
   lightDay: boolean;
   topPriorities: TaskRecord[];
+  workItems: WorkItem[];
   suggestion: SuggestionResult | null;
   anchors: PrayerAnchor[];
   currentPeriod: CurrentPeriod | null;
@@ -52,15 +54,47 @@ interface TodayState {
 }
 
 export const useTodayStore = create<TodayState>((set, get) => {
-  /** تحديث قائمة المهام + الأولويات (مع الطاقة الحالية) */
+  /** تحديث قائمة المهام + الأولويات + عناصر العمل الموحّدة (مع الطاقة الحالية) */
   const refresh = async () => {
-    const energy = (await energyCheckinRepository.getToday())?.level;
-    const tasks = await taskRepository.getOpenTasks();
-    set({
-      tasks,
-      todayEnergy: energy ?? get().todayEnergy,
-      topPriorities: getTopPriorities(tasks, 3, undefined, energy ?? undefined)
-    });
+    try {
+      const energy = (await energyCheckinRepository.getToday())?.level;
+      const tasks = await taskRepository.getOpenTasks();
+
+      // تحميل المسارات النشطة وعناصرها لحساب عناصر العمل الموحّدة
+      let paths: LearningPath[] = [];
+      let itemsByPath: Record<string, PathItem[]> = {};
+      try {
+        paths = await learningPathRepository.getActive();
+        await Promise.all(
+          paths.map(async (p) => {
+            itemsByPath[p.id] = await pathItemRepository.getByPath(p.id);
+          })
+        );
+      } catch (err: unknown) {
+        // فشل قراءة المسارات لا يعطل تحميل المهام والأولويات — المهام الحرة تظهر وحدها.
+        console.warn('[useTodayStore] فشل قراءة المسارات لحساب الأولويات:', err);
+        paths = [];
+        itemsByPath = {};
+      }
+
+      const workItems = getWorkItems(tasks, paths, itemsByPath);
+
+      set({
+        tasks,
+        todayEnergy: energy ?? get().todayEnergy,
+        topPriorities: getTopPriorities(tasks, 3, undefined, energy ?? undefined),
+        workItems
+      });
+    } catch (err: unknown) {
+      // Dexie DatabaseClosedError during parallel test DB teardown or
+      // transient read failure — keep previous state, next load will correct.
+      // Unexpected errors are rethrown so they are not swallowed silently.
+      const isDbClosed =
+        err instanceof Error &&
+        (err.name === 'DatabaseClosedError' ||
+          (err.message ?? '').includes('Database has been closed'));
+      if (!isDbClosed) throw err;
+    }
   };
 
   /** جلب مراسي اليوم مع fallback آمن — لا يُفشِل Today أبدًا */
@@ -99,6 +133,7 @@ export const useTodayStore = create<TodayState>((set, get) => {
     todayEnergy: null,
     lightDay: false,
     topPriorities: [],
+    workItems: [],
     suggestion: null,
     anchors: [],
     currentPeriod: null,
@@ -117,11 +152,31 @@ export const useTodayStore = create<TodayState>((set, get) => {
       } catch {
         // فشل قراءة (قاعدة مغلقة/خطأ) — نكمل بحالة فارغة بلا انهيار أبدًا
       }
+
+      // تحميل المسارات النشطة وعناصرها لحساب عناصر العمل الموحّدة
+      let paths: LearningPath[] = [];
+      let itemsByPath: Record<string, PathItem[]> = {};
+      try {
+        paths = await learningPathRepository.getActive();
+        await Promise.all(
+          paths.map(async (p) => {
+            itemsByPath[p.id] = await pathItemRepository.getByPath(p.id);
+          })
+        );
+      } catch {
+        // فشل قراءة المسارات لا يعطل تحميل الصفحة
+        paths = [];
+        itemsByPath = {};
+      }
+
+      const workItems = getWorkItems(tasks, paths, itemsByPath);
+
       set({
         tasks,
         todayEnergy: energy?.level ?? null,
         lightDay: energy?.wantsLightDay ?? false,
         topPriorities: getTopPriorities(tasks, 3, undefined, energy?.level),
+        workItems,
         loaded: true
       });
       // جلب المواقيت (لا يعلق التحميل — نافذ/fallback في الخلفية)
@@ -218,9 +273,13 @@ onTaskLifecycleChange(() => {
   });
 });
 
-// أي تغيّر في خطوات التعلّم من شاشة أخرى (إضافة/تعديل/حذف/إنجاز) ← إبطال لقطة الاقتراح،
-// فلا يُقترح «ماذا أفعل الآن؟» بخطوة حُذفت أو أُنجزت أو تغيّر عنوانها.
-// إبطال فقط (قراءة عند الطلب) — لا إعادة حساب هنا، ولا كتابة ⇒ لا حلقة.
+// أي تغيّر في خطوات التعلّم من شاشة أخرى (إضافة/تعديل/حذف/إنجاز) ← إعادة حساب الأولويات,
+// فلا تُعرض خطوة حُذفت أو أُنجزت، وتظهر الخطوة التالية تلقائيًا.
+// refresh عملية قراءة فقط (لا كتابة إلى DB) ⇒ لا حلقة تحديث.
 onLearningChange(() => {
-  useTodayStore.getState().clearSuggestion();
+  const store = useTodayStore.getState();
+  store.clearSuggestion();
+  void store.refresh().catch(() => {
+    // قاعدة مغلقة أثناء الإيقاف — التحميل القادم يصحح
+  });
 });

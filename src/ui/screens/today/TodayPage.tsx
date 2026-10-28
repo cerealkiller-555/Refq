@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTodayStore } from '../../../core/store/useTodayStore';
 import { useActiveTaskStore } from '../../../core/store/useActiveTaskStore';
-import { describeReason } from '../../../core/engines/priorityEngine';
+import { describeWorkReason, workItemKey } from '../../../core/engines/workItems';
 import { PRAYER_LABELS } from '../../../core/engines/dayPeriods';
 import { isLearningItem } from '../../../core/engines/suggestionEngine';
 import { voice, greetingForHour } from '../../../i18n/voice';
@@ -60,7 +60,7 @@ export function TodayPage() {
   const tasks = useTodayStore((s) => s.tasks);
   const todayEnergy = useTodayStore((s) => s.todayEnergy);
   const lightDay = useTodayStore((s) => s.lightDay);
-  const topPriorities = useTodayStore((s) => s.topPriorities);
+  const workItems = useTodayStore((s) => s.workItems);
   const suggestion = useTodayStore((s) => s.suggestion);
   const loadToday = useTodayStore((s) => s.loadToday);
   const checkIn = useTodayStore((s) => s.checkIn);
@@ -73,6 +73,7 @@ export function TodayPage() {
   const anchors = useTodayStore((s) => s.anchors);
   const currentPeriod = useTodayStore((s) => s.currentPeriod);
   const startItem = useActiveTaskStore((s) => s.startItem);
+  const completeItem = useActiveTaskStore((s) => s.completeItem);
 
   const [quick, setQuick] = useState('');
   const [energyNote, setEnergyNote] = useState('');
@@ -119,8 +120,8 @@ export function TodayPage() {
   };
 
   const today = localDateKey();
-  const priorityIds = new Set(topPriorities.map((t) => t.id));
-  const todays = tasks.filter((t) => isTodaysTask(t, today, priorityIds));
+  const priorityTaskIds = new Set(workItems.filter((w) => w.kind === 'task').map((w) => w.id));
+  const todays = tasks.filter((t) => isTodaysTask(t, today, priorityTaskIds));
   const restCount = tasks.length - todays.length;
 
   const renderTaskRow = (task: TaskRecord) => (
@@ -281,42 +282,52 @@ export function TodayPage() {
         )}
       </Card>
 
-      {/* أهم أولويات اليوم — قابلة للتنفيذ من هنا مباشرة */}
+      {/* أهم أولويات اليوم — قابلة للتنفيذ من هنا مباشرة (مهام حرة + خطوات مسارات نشطة) */}
       <Card title={voice.today.priorities.title} icon="🎯">
-        {topPriorities.length === 0 ? (
+        {workItems.length === 0 ? (
           <EmptyState>{voice.today.priorities.empty}</EmptyState>
         ) : (
           <ol className="priority-list">
-            {topPriorities.map((task, index) => (
-              <li key={task.id} className="priority-row">
-                <span className="priority-index">{index + 1}</span>
-                <div>
-                  <span className="task-title">{task.title}</span>
-                  <div className="reason-chips">
-                    <Chip>{describeReason(task)}</Chip>
+            {workItems.map((item, index) => {
+              const isLearning = item.kind === 'learning';
+              return (
+                <li key={workItemKey(item)} className={`priority-row${isLearning ? ' learning' : ''}`}>
+                  <span className="priority-index">{index + 1}</span>
+                  <div>
+                    <span className="task-title">{item.title}</span>
+                    {isLearning && item.sourceLabel && (
+                      <span className="path-source">🎓 {item.sourceLabel}</span>
+                    )}
+                    <div className="reason-chips">
+                      <Chip>{describeWorkReason(item)}</Chip>
+                    </div>
                   </div>
-                </div>
-                <div className="priority-actions">
-                  {task.status !== 'in_progress' && (
+                  <div className="priority-actions">
+                    {item.status !== 'in_progress' && (
+                      <button
+                        className="task-start"
+                        aria-label={voice.today.suggestion.start}
+                        title={voice.today.suggestion.start}
+                        onClick={() =>
+                          void startItem(item.id, item.kind, item.title, item.estimatedDuration || 15)
+                        }
+                      >
+                        ▶
+                      </button>
+                    )}
                     <button
-                      className="task-start"
-                      aria-label={voice.today.suggestion.start}
-                      title={voice.today.suggestion.start}
-                      onClick={() => void startItem(task.id, 'task', task.title, task.estimatedDuration || 15)}
+                      className="task-check"
+                      aria-label={voice.common.complete}
+                      onClick={() =>
+                        isLearning ? void completeItem(item.id) : void completeTask(item.id)
+                      }
                     >
-                      ▶
+                      ✓
                     </button>
-                  )}
-                  <button
-                    className="task-check"
-                    aria-label={voice.common.complete}
-                    onClick={() => void completeTask(task.id)}
-                  >
-                    ✓
-                  </button>
-                </div>
-              </li>
-            ))}
+                  </div>
+                </li>
+              );
+            })}
           </ol>
         )}
       </Card>

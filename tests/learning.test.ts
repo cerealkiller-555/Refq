@@ -440,4 +440,49 @@ describe('الاندماج: خطوات التعلّم في "ماذا أفعل ا
     expect(updated?.status).toBe('in_progress');
     expect(await taskRepository.getAll()).toHaveLength(tasksBefore.length);
   });
+
+  it('تحديث الأولويات تلقائيًا بعد إكمال خطوة تعلّم — تظهر الخطوة التالية بدون إعادة تحميل يدوية', async () => {
+    // مسار بخطوتين
+    const path = await learningPathRepository.create(makePath({ title: 'مسار الاختبار' }));
+    const step1 = await pathItemRepository.create(
+      makeItem({ pathId: path.id, order: 0, title: 'الخطوة الأولى', estimatedDuration: 15 })
+    );
+    const step2 = await pathItemRepository.create(
+      makeItem({ pathId: path.id, order: 1, title: 'الخطوة الثانية', estimatedDuration: 15 })
+    );
+
+    // مهمة حرة
+    await taskRepository.create({
+      title: 'مهمة حرة',
+      importance: 'low',
+      urgency: 'low',
+      estimatedDuration: 10,
+      status: 'todo'
+    } as Parameters<typeof taskRepository.create>[0]);
+
+    // تحميل الأولويات
+    await useTodayStore.getState().refresh();
+
+    // الخطوة الأولى والمهمة الحرة يجب أن تكونا في الأولويات
+    let workItems = useTodayStore.getState().workItems;
+    expect(workItems.some((w: any) => w.kind === 'learning' && w.id === step1.id)).toBe(true);
+    expect(workItems.some((w: any) => w.kind === 'task' && w.title === 'مهمة حرة')).toBe(true);
+    expect(workItems.some((w: any) => w.kind === 'learning' && w.id === step2.id)).toBe(false);
+
+    // إكمال الخطوة الأولى عبر متجر التعلّم (يُنشر إشعار 'completed')
+    await useLearningStore.getState().completeItem(step1.id);
+
+    // الانتظار لتحديث الأولويات عبر onLearningChange → refresh()
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // التحقق من أن الخطوة الأولى اختفت والخطوة الثانية ظهرت
+    workItems = useTodayStore.getState().workItems;
+    expect(workItems.some((w: any) => w.kind === 'learning' && w.id === step1.id)).toBe(false);
+    expect(workItems.some((w: any) => w.kind === 'learning' && w.id === step2.id)).toBe(true);
+    expect(workItems.some((w: any) => w.kind === 'task' && w.title === 'مهمة حرة')).toBe(true);
+
+    // التأكد من عدم تكرار الاستدعاء (لا حلقة): العملاء لا يُستدعون أكثر من مرة لكل تغيير
+    const taskItems = workItems.filter((w: any) => w.kind === 'task');
+    expect(taskItems).toHaveLength(1);
+  });
 });
