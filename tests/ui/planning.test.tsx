@@ -4,12 +4,14 @@
 // 1) إضافة حدث من تبويب اليوم ثم ظهوره
 // 2) شبكة الأسبوع تعرض أعمدة الأيام
 // 3) الأحداث الثابتة بشارة الثابت + عرض الشهر/الأسبوع بلا توهان
+// (اختبارات المهام انتقلت إلى myplan.test.tsx مع لوحة TasksPanel)
 // ============================================================
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, cleanup, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { PlanningPage } from '../../src/ui/screens/planning/PlanningPage';
+import { PlanningPage }
+  from '../../src/ui/screens/planning/PlanningPage';
 import { usePlanningStore } from '../../src/core/store/usePlanningStore';
 import { taskRepository } from '../../src/core/db/repositories';
 import { db } from '../../src/core/db/schema';
@@ -139,62 +141,24 @@ describe('Planning Calendar UI', () => {
     expect(document.querySelectorAll('.task-chip').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('مهمة الأسبوع').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('حدث الأسبوع').length).toBeGreaterThanOrEqual(1);
-  });
-});
 
-describe('Planning — المهمة المجدولة تظهر مرة واحدة', () => {
-  it('مهمة مجدولة: شريحة المهام ولا صف أحداث مكرر (الحدث انعكاس مخفي)', async () => {
-    const user = userEvent.setup();
-    await makeTask({ title: 'موعد المكتبة', scheduledAt: localDateTimeISO(todayKey(), '11:00') });
-    await usePlanningStore.getState().load(); // enforce يبني حدث الانعكاس
+    describe('Planning — المهمة المجدولة تظهر مرة واحدة', () => {
+      it('مهمة مجدولة: شريحة المهام ولا صف أحداث مكرر (الحدث انعكاس مخفي)', async () => {
+        const user = userEvent.setup();
+        await makeTask({ title: 'موعد المكتبة', scheduledAt: localDateTimeISO(todayKey(), '11:00') });
+        await usePlanningStore.getState().load(); // enforce يبني حدث الانعكاس
 
-    render(<PlanningPage />);
-    await user.click(await screen.findByRole('tab', { name: cal.tabs.day }));
+        render(<PlanningPage />);
+        await user.click(await screen.findByRole('tab', { name: cal.tabs.day }));
 
-    expect(await screen.findByText('موعد المكتبة')).toBeDefined();
-    // مرة واحدة فقط — لا تكرار بين شريحة المهام وصف الأحداث
-    expect(screen.getAllByText('موعد المكتبة')).toHaveLength(1);
-    expect(document.querySelector('.task-chip')).not.toBeNull();
-    // الملخص: مهمة واحدة · صفر أحداث (انعكاس المهمة لا يُعدّ حدثًا)
-    expect(document.querySelector('.day-summary')?.textContent).toContain('🗓️ 0');
-  });
-});
-
-describe('Planning — تأكيد حذف الحدث قبل التنفيذ', () => {
-  it('ضغطة واحدة تسأل، والإلغاء يبقي الحدث، والتأكيد يحذفه', async () => {
-    const user = userEvent.setup();
-    await usePlanningStore.getState().addOccurrence({
-      title: 'محاضرة للحذف',
-      kind: 'fixed',
-      dateKey: todayKey(),
-      time: '14:00',
-      durationMinutes: 60
+        expect(await screen.findByText('موعد المكتبة')).toBeDefined();
+        // مرة واحدة فقط — لا تكرار بين شريحة المهام وصف الأحداث
+        expect(screen.getAllByText('موعد المكتبة')).toHaveLength(1);
+        expect(document.querySelector('.task-chip')).not.toBeNull();
+        // الملخص: مهمة واحدة · صفر أحداث (انعكاس المهمة لا يُعدّ حدثًا)
+        expect(document.querySelector('.day-summary')?.textContent).toContain('🗓️ 0');
+      });
     });
 
-    render(<PlanningPage />);
-    await user.click(await screen.findByRole('tab', { name: cal.tabs.day }));
-
-    // الضغطة الأولى سؤال فقط — والحدث ما زال موجودًا
-    const row = (await screen.findByText('محاضرة للحذف')).closest('li') as HTMLElement;
-    await user.click(within(row).getByLabelText(voice.common.delete));
-    expect(await screen.findByText(cal.deleteEventConfirm)).toBeDefined();
-    expect(screen.getByText('محاضرة للحذف')).toBeDefined();
-
-    // الإلغاء يبقيه
-    const rowCancel = (await screen.findByText('محاضرة للحذف')).closest('li') as HTMLElement;
-    await user.click(within(rowCancel).getByLabelText(voice.common.cancel));
-    await waitFor(() => {
-      expect(screen.queryByText(cal.deleteEventConfirm)).toBeNull();
-    });
-    expect(screen.getByText('محاضرة للحذف')).toBeDefined();
-
-    // التأكيد = حذف حقيقي
-    const rowAgain = (screen.getByText('محاضرة للحذف').closest('li')) as HTMLElement;
-    await user.click(within(rowAgain).getByLabelText(voice.common.delete));
-    await user.click(within(rowAgain).getByLabelText(voice.common.delete));
-    await waitFor(() => {
-      expect(screen.queryByText('محاضرة للحذف')).toBeNull();
-    });
-    expect(usePlanningStore.getState().events).toHaveLength(0);
   });
 });
